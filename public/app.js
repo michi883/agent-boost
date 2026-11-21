@@ -1,114 +1,69 @@
 (() => {
   'use strict';
 
-  const DEFAULT_SLIDE_URL = '/gemma-slide.html';
+  // Slides render at a fixed 1280x720 and are scaled to fit, so both panels lay out identically.
+  const SLIDE_WIDTH = 1280;
+  const POLL_MS = 400;
 
-  const viewport = document.getElementById('slide-viewport');
-  const placeholder = document.getElementById('slide-placeholder');
-  const frame = document.getElementById('slide-frame');
-  const statusBadge = document.getElementById('viewport-status');
+  const panels = [...document.querySelectorAll('.panel')].map((el) => ({
+    key: el.dataset.panel,
+    src: el.dataset.src,
+    viewport: el.querySelector('.slide-viewport'),
+    placeholder: el.querySelector('.slide-placeholder'),
+    frame: el.querySelector('.slide-frame'),
+    badge: el.querySelector('.status-badge'),
+    signature: undefined,
+  }));
 
-  let currentSource = null;
-
-  function setState(state, label) {
-    viewport.dataset.state = state;
-    if (statusBadge) {
-      statusBadge.dataset.state = state;
-      statusBadge.textContent = label;
-    }
+  function setBadge(panel, state, label) {
+    panel.viewport.dataset.state = state;
+    panel.badge.dataset.state = state;
+    panel.badge.textContent = label;
   }
 
-  /**
-   * Render a complete Gemma-generated HTML document inside the 16:9 slide viewport.
-   */
-  function renderSlideHtml(html) {
-    if (typeof html !== 'string' || html.trim() === '') {
-      clearSlide();
-      return false;
-    }
-
-    frame.removeAttribute('src');
-    frame.srcdoc = html;
-    frame.hidden = false;
-    placeholder.hidden = true;
-    currentSource = { type: 'html' };
-    setState('loaded', 'Slide Loaded');
-    return true;
+  function showSlide(panel, signature) {
+    panel.frame.src = `${panel.src}?v=${encodeURIComponent(signature)}`;
+    panel.frame.hidden = false;
+    panel.placeholder.hidden = true;
+    const time = new Date().toLocaleTimeString([], { hour12: false });
+    setBadge(panel, 'loaded', `Updated ${time}`);
   }
 
-  /**
-   * Render a saved HTML slide by URL inside the 16:9 slide viewport.
-   */
-  function renderSlideUrl(url) {
-    if (typeof url !== 'string' || url.trim() === '') {
-      clearSlide();
-      return false;
-    }
-
-    frame.removeAttribute('srcdoc');
-    frame.src = url;
-    frame.hidden = false;
-    placeholder.hidden = true;
-    currentSource = { type: 'url', url };
-    setState('loaded', 'Slide Loaded');
-    return true;
+  function clearSlide(panel) {
+    panel.frame.src = 'about:blank';
+    panel.frame.hidden = true;
+    panel.placeholder.hidden = false;
+    setBadge(panel, 'empty', 'Waiting');
   }
 
-  /**
-   * Reset the viewport to the initial "Ready for Gemma" state.
-   */
-  function clearSlide() {
-    if (currentSource !== null) {
-      frame.removeAttribute('srcdoc');
-      frame.src = 'about:blank';
-    }
-
-    frame.hidden = true;
-    placeholder.hidden = false;
-    currentSource = null;
-    setState('empty', '16:9 Viewport');
+  function apply(panel, signature) {
+    if (signature === panel.signature) return;
+    panel.signature = signature;
+    if (signature) showSlide(panel, signature);
+    else clearSlide(panel);
   }
 
-  /**
-   * Automatically load public/gemma-slide.html if present.
-   */
-  async function loadDefaultSlide() {
+  async function poll() {
     try {
-      const response = await fetch(DEFAULT_SLIDE_URL, {
-        method: 'HEAD',
-        cache: 'no-store',
-      });
-
-      if (!response.ok) {
-        clearSlide();
-        return false;
+      const response = await fetch('/api/status', { cache: 'no-store' });
+      if (response.ok) {
+        const status = await response.json();
+        panels.forEach((panel) => apply(panel, status[panel.key] || null));
       }
-
-      const contentLength = response.headers.get('content-length');
-      if (contentLength !== null && Number(contentLength) === 0) {
-        clearSlide();
-        return false;
-      }
-
-      return renderSlideUrl(DEFAULT_SLIDE_URL);
     } catch {
-      clearSlide();
-      return false;
+      // Server briefly unavailable; keep showing the last good slides and retry.
+    } finally {
+      setTimeout(poll, POLL_MS);
     }
   }
 
-  function hasSlide() {
-    return currentSource !== null;
-  }
-
-  window.AgentBoost = Object.freeze({
-    renderSlideHtml,
-    renderSlideUrl,
-    loadDefaultSlide,
-    clearSlide,
-    hasSlide,
+  const resizeObserver = new ResizeObserver((entries) => {
+    for (const entry of entries) {
+      const frame = entry.target.querySelector('.slide-frame');
+      frame.style.transform = `scale(${entry.contentRect.width / SLIDE_WIDTH})`;
+    }
   });
+  panels.forEach((panel) => resizeObserver.observe(panel.viewport));
 
-  clearSlide();
-  loadDefaultSlide();
+  poll();
 })();

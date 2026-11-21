@@ -11,29 +11,39 @@
   <div class="app">
     <header class="topbar">
       <h1 class="brand">Agent Boost</h1>
-      <span id="viewport-status" class="status-badge" data-state="empty">16:9 Viewport</span>
     </header>
 
     <main class="stage">
-      <section
-        id="slide-viewport"
-        class="slide-viewport"
-        data-state="empty"
-        aria-label="16:9 Slide Viewport"
-      >
-        <div id="slide-placeholder" class="slide-placeholder" role="status" aria-live="polite">
-          <span class="status-dot" aria-hidden="true"></span>
-          <p class="placeholder-title">Ready for Gemma</p>
-          <p class="placeholder-subtitle">16:9 slide viewport</p>
+      <section class="panel" data-panel="original" data-src="/gemma-slide.html">
+        <div class="panel-inner">
+          <div class="panel-label">
+            <span class="panel-title">Original <span class="panel-model">Gemma 31B</span></span>
+            <span class="status-badge" data-state="empty">Waiting</span>
+          </div>
+          <div class="slide-viewport" data-state="empty">
+            <div class="slide-placeholder" role="status" aria-live="polite">
+              <span class="status-dot" aria-hidden="true"></span>
+              <p class="placeholder-title">Waiting for Gemma</p>
+            </div>
+            <iframe class="slide-frame" title="Original slide" sandbox="allow-scripts allow-same-origin" hidden></iframe>
+          </div>
         </div>
+      </section>
 
-        <iframe
-          id="slide-frame"
-          class="slide-frame"
-          title="Slide viewport"
-          sandbox="allow-scripts allow-same-origin"
-          hidden
-        ></iframe>
+      <section class="panel" data-panel="improved" data-src="/gemini/index.html">
+        <div class="panel-inner">
+          <div class="panel-label">
+            <span class="panel-title">Improved <span class="panel-model">Gemini Neon</span></span>
+            <span class="status-badge" data-state="empty">Waiting</span>
+          </div>
+          <div class="slide-viewport" data-state="empty">
+            <div class="slide-placeholder" role="status" aria-live="polite">
+              <span class="status-dot" aria-hidden="true"></span>
+              <p class="placeholder-title">Waiting for Gemini</p>
+            </div>
+            <iframe class="slide-frame" title="Improved slide" sandbox="allow-scripts allow-same-origin" hidden></iframe>
+          </div>
+        </div>
       </section>
     </main>
   </div>

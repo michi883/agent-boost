@@ -84,7 +84,79 @@ function resolvePublicFile(requestUrl) {
   return { filePath: realPath };
 }
 
+// Files the viewer watches. A signature changes whenever the content is rewritten.
+const ORIGINAL_FILE = path.join(PUBLIC_DIR, 'gemma-slide.html');
+const IMPROVED_DIR = path.join(PUBLIC_DIR, 'gemini');
+const IMPROVED_ENTRY = path.join(IMPROVED_DIR, 'index.html');
+
+async function fileSignature(filePath) {
+  try {
+    const stat = await fs.promises.stat(filePath);
+    return stat.isFile() && stat.size > 0 ? `${Math.round(stat.mtimeMs)}-${stat.size}` : null;
+  } catch {
+    return null;
+  }
+}
+
+// Covers every file under the improved slide's folder, so edits to its JS/CSS also trigger a reload.
+async function dirSignature(dir, entry) {
+  if (!(await fileSignature(entry))) return null;
+
+  let maxMtime = 0;
+  let totalSize = 0;
+  let count = 0;
+  const pending = [dir];
+
+  while (pending.length > 0 && count < 500) {
+    const current = pending.pop();
+    let entries;
+    try {
+      entries = await fs.promises.readdir(current, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const dirent of entries) {
+      if (dirent.name.startsWith('.')) continue;
+      const fullPath = path.join(current, dirent.name);
+      if (dirent.isDirectory()) {
+        pending.push(fullPath);
+      } else if (dirent.isFile()) {
+        try {
+          const stat = await fs.promises.stat(fullPath);
+          maxMtime = Math.max(maxMtime, stat.mtimeMs);
+          totalSize += stat.size;
+          count += 1;
+        } catch {
+          // File vanished mid-scan; the next poll picks up the new state.
+        }
+      }
+    }
+  }
+
+  return `${Math.round(maxMtime)}-${totalSize}-${count}`;
+}
+
+async function sendStatus(res) {
+  const [original, improved] = await Promise.all([
+    fileSignature(ORIGINAL_FILE),
+    dirSignature(IMPROVED_DIR, IMPROVED_ENTRY),
+  ]);
+  const body = JSON.stringify({ original, improved });
+  res.writeHead(200, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Content-Length': Buffer.byteLength(body),
+    'X-Content-Type-Options': 'nosniff',
+    'Cache-Control': 'no-store',
+  });
+  res.end(body);
+}
+
 const server = http.createServer((req, res) => {
+  if (req.method === 'GET' && (req.url || '').split('?')[0] === '/api/status') {
+    sendStatus(res).catch(() => sendText(res, 500, 'Internal Server Error'));
+    return;
+  }
+
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     sendText(res, 405, 'Method Not Allowed');
     return;

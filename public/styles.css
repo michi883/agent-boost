@@ -37,7 +37,6 @@ body {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  justify-content: space-between;
   min-height: 28px;
 }
 
@@ -49,10 +48,64 @@ body {
   color: #f3f6fc;
 }
 
+/* Two equal cells; each holds the largest 16:9 slide (plus label) that fits. */
+.stage {
+  flex: 1 1 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(12px, 2vmin, 24px);
+}
+
+@media (max-aspect-ratio: 1/1) {
+  .stage {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 1fr;
+  }
+}
+
+.panel {
+  min-width: 0;
+  min-height: 0;
+  container-type: size;
+  display: grid;
+  place-items: center;
+}
+
+.panel-inner {
+  --label-h: 30px;
+  --label-gap: 8px;
+  width: min(100cqw, calc((100cqh - var(--label-h) - var(--label-gap)) * 16 / 9));
+  display: flex;
+  flex-direction: column;
+  gap: var(--label-gap);
+}
+
+.panel-label {
+  height: var(--label-h);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.panel-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #f3f6fc;
+}
+
+.panel-model {
+  margin-left: 6px;
+  font-weight: 500;
+  color: #8b99b0;
+}
+
 .status-badge {
   font-size: 0.75rem;
   font-weight: 500;
   letter-spacing: 0.03em;
+  white-space: nowrap;
   color: #9aa7bd;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -66,34 +119,19 @@ body {
   background: rgba(139, 233, 181, 0.08);
 }
 
-.stage {
-  flex: 1 1 0;
-  min-height: 0;
-  min-width: 0;
-  width: 100%;
-  display: grid;
-  place-items: center;
-  container-type: size;
-  overflow: hidden;
-}
-
 .slide-viewport {
   position: relative;
+  width: 100%;
   aspect-ratio: 16 / 9;
-  width: min(100cqw, calc(100cqh * 16 / 9));
-  height: min(100cqh, calc(100cqw * 9 / 16));
-  max-width: 100%;
-  max-height: 100%;
   border-radius: 12px;
   overflow: hidden;
   background: #121722;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12), 0 24px 64px rgba(0, 0, 0, 0.5);
 }
 
 .slide-placeholder {
-  width: 100%;
-  height: 100%;
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -116,23 +154,20 @@ body {
 
 .placeholder-title {
   margin: 0;
-  font-size: clamp(1.5rem, 3.2vw, 2.5rem);
+  font-size: clamp(1.1rem, 2vw, 1.75rem);
   font-weight: 600;
   letter-spacing: -0.02em;
   color: #f8fafc;
 }
 
-.placeholder-subtitle {
-  margin: 0;
-  font-size: clamp(0.85rem, 1.2vw, 1rem);
-  color: #8b99b0;
-  letter-spacing: 0.02em;
-}
-
+/* Rendered at 1280x720 and scaled to the viewport by app.js. */
 .slide-frame {
-  display: block;
-  width: 100%;
-  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1280px;
+  height: 720px;
   border: 0;
-  background: #ffffff;
+  transform-origin: 0 0;
+  background: #0b1220;
 }

@@ -25,14 +25,15 @@ Then run `node gemma-generate.js`. Gemma writes the slide body; the script wraps
 
 ## Structure
 
-- `server.js` — zero-dependency Node static server confined to `public/` (never serves `.env` or dotfiles)
-- `public/index.html`, `public/styles.css`, `public/app.js` — plain HTML/CSS/JS single-screen 16:9 viewport
+- `server.js` — zero-dependency Node static server confined to `public/` (never serves `.env` or dotfiles); `GET /api/status` returns a change signature for each slide
+- `public/index.html`, `public/styles.css`, `public/app.js` — single-screen before/after viewer
 - `.gitignore` — prevents `.env` from being committed
 
-## Rendering Slides (Ready for Step 2)
+## Before / After Viewer
 
-`window.AgentBoost` exposes:
+Two side-by-side 16:9 panels, each rendered at 1280×720 and scaled to fit:
 
-- `renderSlideHtml(html)` — renders Gemma-generated HTML into the 16:9 iframe via `srcdoc`
-- `renderSlideUrl(url)` — loads a saved slide URL into the 16:9 iframe
-- `clearSlide()` — restores the `Ready for Gemma` state
+- **Original (Gemma 31B)** shows `public/gemma-slide.html`.
+- **Improved (Gemini Neon)** shows `public/gemini/index.html` and stays empty until that file exists. Any change to a file under `public/gemini/` reloads it.
+
+The page polls `/api/status` every 400 ms and reloads a panel only when its files change, with no browser refresh needed.
