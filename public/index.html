@@ -13,6 +13,9 @@
       <div class="brand">
         <span class="mark" aria-hidden="true"></span>
         <h1>Agent Boost</h1>
+        <button class="info-btn" id="arch-open" type="button" aria-label="How Agent Boost works" aria-haspopup="dialog">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.6"/><path d="M8 7.2v4"/><circle cx="8" cy="4.9" r="0.4"/></svg>
+        </button>
         <p class="tagline"><span class="agent gemini">Gemini</span> builds <span class="agent gemma">Gemma</span> a reusable tool.</p>
       </div>
       <ol class="progress" aria-label="Progress">
@@ -113,6 +116,44 @@
       </section>
     </main>
   </div>
+
+  <!-- Architecture at a glance (opened by the (i) next to the title). Static: no interaction beyond open and close. -->
+  <dialog class="arch" id="arch" aria-labelledby="arch-title">
+    <div class="arch-inner">
+      <h2 id="arch-title">How Agent Boost works</h2>
+      <button class="arch-close" id="arch-close" type="button" aria-label="Close">×</button>
+
+      <div class="arch-flow">
+        <div class="arch-stage" data-owner="gemma">
+          <span class="arch-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="4.5" width="19" height="14" rx="2"/><path d="M6.5 9.5h11M6.5 13.5h7"/></svg></span>
+          <p class="arch-label"><span class="agent gemma">Gemma</span> creates</p>
+          <p class="arch-sub">a slide</p>
+        </div>
+        <svg class="arch-arrow" viewBox="0 0 40 16" aria-hidden="true"><path d="M2 8h34M29 2l7 6-7 6"/></svg>
+
+        <div class="arch-stage wide" data-owner="gemini">
+          <span class="arch-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94z"/></svg></span>
+          <p class="arch-label"><span class="agent gemini">Gemini</span> builds</p>
+          <p class="arch-sub">a new tool</p>
+          <p class="arch-parts"><b>Decisions</b> checks<i>·</i><b>Hydrogen</b> builds<i>·</i><b>Neon</b> names<i>·</i><b>Browser</b> verifies</p>
+        </div>
+        <svg class="arch-arrow" viewBox="0 0 40 16" aria-hidden="true"><path d="M2 8h34M29 2l7 6-7 6"/></svg>
+
+        <div class="arch-stage" data-owner="gemma">
+          <span class="arch-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72zM14 7l3 3M5 6v4M19 14v4M10 2v2M7 8H3M21 16h-4M11 3H9"/></svg></span>
+          <p class="arch-label"><span class="agent gemma">Gemma</span> uses</p>
+          <p class="arch-sub">the tool, on its own</p>
+        </div>
+        <svg class="arch-arrow" viewBox="0 0 40 16" aria-hidden="true"><path d="M2 8h34M29 2l7 6-7 6"/></svg>
+
+        <div class="arch-stage" data-owner="eval">
+          <span class="arch-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21h18"/><rect class="alone" x="5" y="13" width="5" height="8" rx="1"/><rect class="boosted" x="14" y="4" width="5" height="17" rx="1"/></svg></span>
+          <p class="arch-label">Evaluation</p>
+          <p class="arch-sub">on unseen tasks</p>
+        </div>
+      </div>
+    </div>
+  </dialog>
 
   <script src="/app.js"></script>
 </body>

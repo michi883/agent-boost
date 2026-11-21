@@ -1023,3 +1023,206 @@ input {
   font-weight: 650;
   color: var(--ink);
 }
+
+/* --- Architecture at a glance: (i) next to the title opens a static four-stage diagram --- */
+.info-btn {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  margin-left: -3px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--faint);
+  cursor: pointer;
+}
+
+.info-btn:hover,
+.info-btn:focus-visible {
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.info-btn svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+
+.arch {
+  width: min(1240px, calc(100vw - 40px));
+  max-width: none;
+  max-height: calc(100dvh - 40px);
+  padding: 0;
+  border: 0;
+  border-radius: 20px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.22);
+}
+
+.arch::backdrop {
+  background: rgba(15, 23, 42, 0.32);
+}
+
+.arch[open] {
+  animation: arch-in 160ms ease-out;
+}
+
+@keyframes arch-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.arch-inner {
+  position: relative;
+  padding: 30px 36px 40px;
+}
+
+.arch h2 {
+  margin: 0 0 30px;
+  text-align: center;
+  font-size: 21px;
+  font-weight: 750;
+}
+
+.arch-close {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 36px;
+  height: 36px;
+  padding: 0 0 2px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.arch-close:hover {
+  border-color: var(--muted);
+  color: var(--ink);
+}
+
+.arch-close:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.arch-flow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 40px minmax(0, 2.2fr) 40px minmax(0, 1fr) 40px minmax(0, 1fr);
+  align-items: stretch;
+}
+
+[data-owner="eval"] {
+  --accent: var(--body);
+  --accent-soft: #f8fafc;
+}
+
+.arch-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  min-width: 0;
+  padding: 28px 12px 24px;
+  border: 1.5px solid color-mix(in srgb, var(--accent) 30%, var(--line));
+  border-radius: 18px;
+  background: var(--accent-soft);
+  text-align: center;
+}
+
+.arch-ico {
+  display: grid;
+  place-items: center;
+  width: 76px;
+  height: 76px;
+  margin-bottom: 18px;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--accent) 25%, var(--line)), 0 6px 16px rgba(15, 23, 42, 0.06);
+}
+
+.arch-ico svg {
+  width: 36px;
+  height: 36px;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.arch-ico .alone {
+  stroke: var(--gemma);
+}
+
+.arch-ico .boosted {
+  stroke: var(--gemini);
+  fill: var(--gemini-soft);
+}
+
+.arch-label {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 750;
+  line-height: 1.2;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.arch-sub {
+  margin: 6px 0 0;
+  font-size: 15px;
+  font-weight: 550;
+  color: var(--muted);
+}
+
+.arch-stage.wide .arch-sub {
+  margin-bottom: 18px;
+}
+
+.arch-parts {
+  align-self: stretch;
+  margin: auto 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--gemini-line);
+  font-size: 11.5px;
+  font-weight: 550;
+  color: var(--body);
+  white-space: nowrap;
+}
+
+.arch-parts b {
+  font-weight: 750;
+  color: var(--gemini);
+}
+
+.arch-parts i {
+  margin: 0 5px;
+  font-style: normal;
+  color: var(--faint);
+}
+
+.arch-arrow {
+  align-self: center;
+  justify-self: center;
+  width: 34px;
+  height: 14px;
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}

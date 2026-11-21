@@ -528,6 +528,12 @@
     render();
   });
   ui.newRun.addEventListener('click', newRun);
+  const arch = $('arch');
+  $('arch-open').addEventListener('click', () => arch.showModal());
+  $('arch-close').addEventListener('click', () => arch.close());
+  arch.addEventListener('click', (event) => {
+    if (event.target === arch) arch.close();
+  });
   Object.values(panels).forEach((panel) =>
     panel.toggle.addEventListener('click', () => {
       panel.showDetails = !panel.showDetails;
