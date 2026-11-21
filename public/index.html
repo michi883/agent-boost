@@ -11,6 +11,11 @@
   <div class="app">
     <header class="topbar">
       <h1 class="brand">Agent Boost</h1>
+      <form id="neon-form" class="neon-form">
+        <input id="neon-prompt" class="neon-prompt" type="text" value="Integrate 3D visualization" maxlength="500" aria-label="Prompt for Gemini Neon" required>
+        <button id="neon-button" class="neon-button" type="submit">Improve with Neon</button>
+        <span id="neon-status" class="neon-status" data-state="idle" aria-live="polite"></span>
+      </form>
     </header>
 
     <main class="stage">

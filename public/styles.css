@@ -37,7 +37,96 @@ body {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  min-height: 28px;
+  gap: 16px;
+  min-height: 32px;
+}
+
+.neon-form {
+  flex: 0 1 600px;
+  min-width: 0;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.neon-prompt {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #f3f6fc;
+  font: inherit;
+  font-size: 0.875rem;
+}
+
+.neon-prompt:focus {
+  outline: 2px solid #60a5fa;
+  outline-offset: 1px;
+}
+
+.neon-button {
+  flex: 0 0 auto;
+  height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 8px;
+  background: #3b82f6;
+  color: #ffffff;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.neon-button:hover:not(:disabled) {
+  background: #2563eb;
+}
+
+.neon-button:disabled,
+.neon-prompt:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.neon-status {
+  flex: 0 0 150px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: #9aa7bd;
+}
+
+.neon-status[data-state="running"]::before {
+  content: "";
+  flex: 0 0 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #60a5fa;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.neon-status[data-state="done"] {
+  color: #8be9b5;
+}
+
+.neon-status[data-state="error"] {
+  color: #fca5a5;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.25;
+  }
 }
 
 .brand {

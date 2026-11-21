@@ -43,11 +43,75 @@
     else clearSlide(panel);
   }
 
+  // --- Gemini Neon run (the server runs agy; the browser only starts it and shows progress) ---
+  const form = document.getElementById('neon-form');
+  const promptInput = document.getElementById('neon-prompt');
+  const button = document.getElementById('neon-button');
+  const statusEl = document.getElementById('neon-status');
+  const improved = panels.find((panel) => panel.key === 'improved');
+  const waitingTitle = improved.placeholder.querySelector('.placeholder-title');
+
+  let neon = { state: 'idle' };
+  let clickAt = null; // local click time, so elapsed time covers the full click-to-done path
+  let ticker = null;
+
+  const seconds = (ms) => `${(ms / 1000).toFixed(1)} s`;
+  const runStart = () =>
+    clickAt !== null && neon.startedAt - clickAt >= 0 && neon.startedAt - clickAt < 5000 ? clickAt : neon.startedAt;
+
+  function renderNeon() {
+    const running = neon.state === 'running';
+    button.disabled = running;
+    promptInput.disabled = running;
+    waitingTitle.textContent = running ? 'Neon is working…' : 'Waiting for Gemini';
+
+    // Neon may keep refining after the first write (the panel reloads each time), so "done" means agy finished.
+    let label = '';
+    if (running) label = `Working… ${seconds(Date.now() - runStart())}`;
+    else if (neon.state === 'done') label = `Done in ${seconds(neon.finishedAt - runStart())}`;
+    else if (neon.state === 'error') label = `Failed: ${neon.error}`;
+
+    statusEl.dataset.state = neon.state;
+    statusEl.textContent = label;
+    statusEl.title = label;
+
+    if (running && !ticker) ticker = setInterval(renderNeon, 100);
+    if (!running && ticker) {
+      clearInterval(ticker);
+      ticker = null;
+    }
+  }
+
+  function applyNeon(next) {
+    if (!next) return;
+    neon = next;
+    renderNeon();
+  }
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (neon.state === 'running') return;
+    clickAt = Date.now();
+    button.disabled = true;
+    try {
+      const response = await fetch('/api/improve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: promptInput.value }),
+      });
+      const data = await response.json().catch(() => null);
+      applyNeon(data?.neon || { state: 'error', error: `request failed (${response.status})` });
+    } catch {
+      applyNeon({ state: 'error', error: 'server unreachable' });
+    }
+  });
+
   async function poll() {
     try {
       const response = await fetch('/api/status', { cache: 'no-store' });
       if (response.ok) {
         const status = await response.json();
+        applyNeon(status.neon);
         panels.forEach((panel) => apply(panel, status[panel.key] || null));
       }
     } catch {

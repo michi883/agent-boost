@@ -40,7 +40,9 @@ The page polls `/api/status` every 400 ms and reloads a panel only when its file
 
 ## Live Gemini Improvement
 
-From the repo root (agy loads `AGENTS.md` automatically):
+In the browser, click **Improve with Neon** (prompt defaults to `Integrate 3D visualization`). The server clears `public/gemini/`, runs `agy -p <prompt> --model gemini-4-neon-xhigh --mode accept-edits --output-format stream-json` from the repo root, and reports progress through `/api/status`; the right panel reloads on every write. Requests are accepted only from the page itself (same-origin JSON POST). Override with `AGY_BIN` / `NEON_MODEL`.
+
+Equivalent terminal flow (agy loads `AGENTS.md` automatically):
 
 ```bash
 rm -rf public/gemini   # reset; the right panel shows "Waiting for Gemini"
