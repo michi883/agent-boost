@@ -25,28 +25,27 @@ Then run `node gemma-generate.js`. Gemma writes the slide body; the script wraps
 
 ## Structure
 
-- `server.js` — zero-dependency Node static server confined to `public/` (never serves `.env` or dotfiles); `GET /api/status` returns a change signature for each slide
-- `public/index.html`, `public/styles.css`, `public/app.js` — single-screen before/after viewer
+- `server.js` — zero-dependency Node static server confined to `public/` (never serves `.env` or dotfiles); runs Gemma and Neon for the browser and reports progress via `GET /api/status`
+- `gemma-generate.js` — Gemma's harness; `--tools` offers it every tool installed in `tools/`
+- `tools/` — tools Gemma can discover (not web-served)
+- `public/index.html`, `public/styles.css`, `public/app.js` — single-screen viewer
 - `.gitignore` — prevents `.env` from being committed
 
-## Before / After Viewer
+## Demo Flow (all from the browser)
 
-Two side-by-side 16:9 panels, each rendered at 1280×720 and scaled to fit:
+Run `node server.js` (with the Gemma server up) and open `http://127.0.0.1:3000`. Three steps, each a button with live status:
 
-- **Original (Gemma 31B)** shows `public/gemma-slide.html`.
-- **Improved (Gemini Neon)** shows `public/gemini/index.html` and stays empty until that file exists. Any change to a file under `public/gemini/` reloads it.
+1. **Gemma creates slide.** Runs `node gemma-generate.js` (baseline, no tools). Left panel: `public/gemma-slide.html`.
+2. **Gemini builds tool.** Drives agy through its Agent Client Protocol server (`agy acp`, model `gemini-4-hydrogen-medium`) with the prompt plus Gemma's slide. Per `AGENTS.md`, Gemini replies with a one-sentence plan and the code (no tool use; any tool request is refused). The server runs the code once on a different topic and installs it as `tools/make_3d_slide.js` only if it returns an HTML page. Set `GEMINI_MODEL` (for example `gemini-4-hydrogen-high` or `gemini-4-neon-xhigh`; `agy models` lists them) or `AGY_BIN` to override.
+3. **Gemma uses tool.** Runs `node gemma-generate.js --tools`: the same request, with every installed tool offered (`tool_choice: auto`; the prompt never names a tool). Gemma decides whether to call one; the harness runs the call and writes the returned page to `public/gemma-tool/index.html` (right panel). Gemma's raw tool calls and timings go to `public/gemma-tool/run.json`.
 
-The page polls `/api/status` every 400 ms and reloads a panel only when its files change, with no browser refresh needed.
+While a step runs, its panel shows live milestones taken from real output: Gemma's title and themes as it generates them (thinking stays off for speed), and Gemini's latest thought heading, plan, the features its code adds as it streams, the test and the install. Runs are accepted only from the page itself (same-origin JSON POST). Panels reload automatically when their files change.
 
-## Live Gemini Improvement
+## Tools
 
-In the browser, click **Improve with Neon** (prompt defaults to `Integrate 3D visualization`). The server clears `public/gemini/`, runs `agy -p <prompt> --model gemini-4-neon-xhigh --mode accept-edits --output-format stream-json` from the repo root, and reports progress through `/api/status`; the right panel reloads on every write. Requests are accepted only from the page itself (same-origin JSON POST). Override with `AGY_BIN` / `NEON_MODEL`.
+A tool is two files in `tools/`; both must exist for Gemma to see it:
 
-Equivalent terminal flow (agy loads `AGENTS.md` automatically):
+- `<name>.json` — OpenAI function schema (`name`, `description`, `parameters`)
+- `<name>.js` — `module.exports = (args) => '<!DOCTYPE html>…'`, returning a complete page
 
-```bash
-rm -rf public/gemini   # reset; the right panel shows "Waiting for Gemini"
-agy --model gemini-4-neon-xhigh --mode accept-edits
-```
-
-Then enter `Integrate 3D visualization`. Neon reads `public/gemma-slide.html` and writes `public/gemini/index.html`, which appears in the right panel. `--mode accept-edits` lets it write without an approval prompt.
+`tools/make_3d_slide.json` defines the interface for the 3D tool: `title`, `subtitle`, and `milestones`, each one flat string `"Q1 | Theme | point | point | point"` (flat strings keep Gemma's tool-call arguments short and avoid nested-list parsing issues). Its implementation, `tools/make_3d_slide.js`, is written by Gemini during the demo.

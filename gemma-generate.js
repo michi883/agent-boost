@@ -5,9 +5,34 @@ const path = require('node:path');
 const { performance } = require('node:perf_hooks');
 
 const GEMMA_URL = process.env.GEMMA_URL || 'http://127.0.0.1:8099';
-const DEMO_PROMPT = process.argv[2] || 'Create a 2027 go-to-market roadmap slide';
+const WITH_TOOLS = process.argv.includes('--tools');
+// --stream: print progress milestones as NDJSON {"milestone"} lines and the summary as a final {"summary"} line.
+const STREAM = process.argv.includes('--stream');
+const seenMilestones = new Set();
+function milestone(text) {
+  if (!STREAM || seenMilestones.has(text)) return;
+  seenMilestones.add(text);
+  process.stdout.write(JSON.stringify({ milestone: text }) + '\n');
+}
+
+// Milestones read from what Gemma has generated so far: its choice of tool, the title, then each quarter's theme.
+function trackMilestones(content, call) {
+  if (call) {
+    if (call.name) milestone(`Chose tool: ${call.name}`);
+    const title = call.arguments.match(/"title"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+    if (title) milestone(`Title: ${title[1]}`);
+    for (const m of call.arguments.matchAll(/"([^"|]+?)\s*\|\s*([^"|]+?)\s*\|[^"]*"/g)) milestone(`${m[1]} · ${m[2]}`);
+  } else {
+    const title = content.match(/<h1>(.*?)<\/h1>/);
+    if (title) milestone(`Title: ${title[1]}`);
+    [...content.matchAll(/<h2>(.*?)<\/h2>/g)].forEach((m, i) => milestone(`Q${i + 1} · ${m[1]}`));
+  }
+}
+const DEMO_PROMPT = process.argv.slice(2).find((arg) => !arg.startsWith('--')) || 'Create a 2027 go-to-market roadmap slide';
 const OUTPUT_PATH = path.resolve(__dirname, 'public', 'gemma-slide.html');
 const RAW_OUTPUT_PATH = path.resolve(__dirname, 'public', 'gemma-raw.html');
+const TOOLS_DIR = path.resolve(__dirname, 'tools');
+const TOOL_OUTPUT_DIR = path.resolve(__dirname, 'public', 'gemma-tool');
 
 // Fixed, reusable 16:9 frame. Gemma writes the slide body; this shell only supplies styling.
 // Quarter labels (Q1-Q4) come from a CSS counter so Gemma doesn't spend tokens on them.
@@ -23,14 +48,54 @@ const SYSTEM_PROMPT =
   '<section><h2>1-2 word theme, no quarter label</h2><ul><li>2-3 words</li><li>2-3 words</li><li>2-3 words</li></ul></section>' +
   ' x4 (one per quarter, no attributes)</main>';
 
+// With --tools, Gemma decides for itself whether a tool fits; the prompt never names one.
+const TOOL_SYSTEM_PROMPT =
+  'You create slides. When a provided tool can make the requested slide, call it. Otherwise o' + SYSTEM_PROMPT.slice(1);
+
+// A tool is tools/<name>.json (OpenAI function schema: name, description, parameters) plus tools/<name>.js
+// (module.exports = (args) => complete HTML page). Tools are discovered on every run, so adding the files adds the tool.
+function loadTools() {
+  let files;
+  try {
+    files = fs.readdirSync(TOOLS_DIR);
+  } catch {
+    return [];
+  }
+  return files
+    .filter((file) => file.endsWith('.json') && files.includes(file.replace(/\.json$/, '.js')))
+    .map((file) => {
+      const schema = JSON.parse(fs.readFileSync(path.join(TOOLS_DIR, file), 'utf8'));
+      const run = require(path.join(TOOLS_DIR, file.replace(/\.json$/, '.js')));
+      if (schema.name !== path.basename(file, '.json') || typeof run !== 'function') {
+        throw new Error(`Invalid tool ${file}: name must match the file and the module must export a function`);
+      }
+      return { schema, run };
+    });
+}
+
 function extractBody(text) {
   const trimmed = text.trim();
   const fenced = trimmed.match(/```(?:html)?\s*\n?([\s\S]*?)(?:```|$)/i);
   return (fenced ? fenced[1] : trimmed).trim();
 }
 
+function validBody(content, finishReason) {
+  // The stop sequence strips the closing tag; restore it.
+  const body = extractBody(content).replace(/(<\/main>)?\s*$/i, '</main>');
+  const sections = (body.match(/<section>/gi) || []).length;
+  if (finishReason === 'length' || !/<h1>/i.test(body) || !/<main>/i.test(body) || sections !== 4) {
+    throw new Error(
+      `Incomplete or invalid slide from Gemma (finishReason=${finishReason}, sections=${sections}, chars=${body.length})\n${content}`
+    );
+  }
+  return body;
+}
+
 async function generateSlide() {
   const totalStart = performance.now();
+  const tools = WITH_TOOLS ? loadTools() : [];
+  if (WITH_TOOLS && tools.length === 0) throw new Error('No tools installed in tools/');
+  milestone(WITH_TOOLS ? `Same request, now offered: ${tools.map((tool) => tool.schema.name).join(', ')}` : 'Request sent to Gemma 31B');
 
   const response = await fetch(`${GEMMA_URL}/v1/chat/completions`, {
     method: 'POST',
@@ -43,9 +108,13 @@ async function generateSlide() {
       stop: ['</main>'],
       chat_template_kwargs: { enable_thinking: false },
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: WITH_TOOLS ? TOOL_SYSTEM_PROMPT : SYSTEM_PROMPT },
         { role: 'user', content: DEMO_PROMPT },
       ],
+      ...(WITH_TOOLS && {
+        tools: tools.map((tool) => ({ type: 'function', function: tool.schema })),
+        tool_choice: 'auto',
+      }),
     }),
   });
 
@@ -61,6 +130,7 @@ async function generateSlide() {
   let usage = null;
   let timings = null;
   let finishReason = null;
+  const toolCalls = [];
 
   while (true) {
     const { done, value } = await reader.read();
@@ -90,51 +160,85 @@ async function generateSlide() {
       if (choice.finish_reason) finishReason = choice.finish_reason;
 
       const token = choice.delta?.content;
-      if (token) {
-        if (firstTokenMs === null) firstTokenMs = performance.now() - totalStart;
-        content += token;
+      const callDeltas = choice.delta?.tool_calls || [];
+      if (firstTokenMs === null && (token || callDeltas.length)) firstTokenMs = performance.now() - totalStart;
+      if (token) content += token;
+      // Tool calls stream as fragments: the name first, then the JSON arguments piece by piece.
+      for (const delta of callDeltas) {
+        const call = (toolCalls[delta.index ?? 0] ||= { name: '', arguments: '' });
+        call.name += delta.function?.name || '';
+        call.arguments += delta.function?.arguments || '';
       }
+      if (token || callDeltas.length) trackMilestones(content, toolCalls[0]);
     }
   }
 
   const generationMs = performance.now() - totalStart;
-  // The stop sequence strips the closing tag; restore it.
-  const body = extractBody(content).replace(/(<\/main>)?\s*$/i, '</main>');
-  const sections = (body.match(/<section>/gi) || []).length;
+  let html;
+  let toolMs = null;
+  let outputPath = OUTPUT_PATH;
 
-  if (finishReason === 'length' || !/<h1>/i.test(body) || !/<main>/i.test(body) || sections !== 4) {
-    throw new Error(
-      `Incomplete or invalid slide from Gemma (finishReason=${finishReason}, sections=${sections}, chars=${body.length})\n${content}`
-    );
+  if (!WITH_TOOLS) {
+    html = SHELL_START + validBody(content, finishReason) + SHELL_END;
+    fs.writeFileSync(RAW_OUTPUT_PATH, content, 'utf8');
+    fs.writeFileSync(OUTPUT_PATH, html, 'utf8');
+  } else {
+    const call = toolCalls[0];
+    if (call) {
+      const tool = tools.find((t) => t.schema.name === call.name);
+      if (!tool) throw new Error(`Gemma called an unknown tool: ${call.name}`);
+      // Gemma's own string delimiter leaking through means the server mis-parsed the call and content was lost.
+      if (call.arguments.includes('<|')) throw new Error(`Garbled arguments in ${call.name} call: ${call.arguments}`);
+      let args;
+      try {
+        args = JSON.parse(call.arguments);
+      } catch {
+        throw new Error(`Invalid JSON arguments in ${call.name} call: ${call.arguments}`);
+      }
+      const toolStart = performance.now();
+      html = await tool.run(args);
+      toolMs = performance.now() - toolStart;
+      if (typeof html !== 'string' || !/<html[\s>]/i.test(html)) throw new Error(`${call.name} did not return an HTML page`);
+      milestone(`${call.name} returned the slide (${(html.length / 1024).toFixed(1)} KB in ${toolMs.toFixed(1)} ms)`);
+    } else {
+      // Gemma chose not to use any tool and wrote the slide itself.
+      html = SHELL_START + validBody(content, finishReason) + SHELL_END;
+      milestone('Gemma wrote the slide itself (no tool call)');
+    }
+    outputPath = path.join(TOOL_OUTPUT_DIR, 'index.html');
   }
 
-  const html = SHELL_START + body + SHELL_END;
-  fs.writeFileSync(RAW_OUTPUT_PATH, content, 'utf8');
-  fs.writeFileSync(OUTPUT_PATH, html, 'utf8');
-
   const completionTokens = usage?.completion_tokens ?? null;
-  console.log(
-    JSON.stringify(
-      {
-        prompt: DEMO_PROMPT,
-        outputPath: OUTPUT_PATH,
-        finishReason,
-        bytes: Buffer.byteLength(html, 'utf8'),
-        promptTokens: usage?.prompt_tokens ?? null,
-        completionTokens,
-        firstTokenMs: firstTokenMs !== null ? Number(firstTokenMs.toFixed(1)) : null,
-        generationMs: Number(generationMs.toFixed(1)),
-        tokensPerSec:
-          completionTokens && generationMs > 0
-            ? Number((completionTokens / (generationMs / 1000)).toFixed(1))
-            : null,
-        draftAccepted: timings?.draft_n_accepted ?? null,
-        draftProposed: timings?.draft_n ?? null,
-      },
-      null,
-      2
-    )
-  );
+  const summary = {
+    prompt: DEMO_PROMPT,
+    outputPath,
+    ...(WITH_TOOLS && {
+      toolsOffered: tools.map((tool) => tool.schema.name),
+      toolCalls, // exactly as Gemma emitted them (raw JSON arguments)
+      toolMs: toolMs !== null ? Number(toolMs.toFixed(1)) : null,
+    }),
+    finishReason,
+    bytes: Buffer.byteLength(html, 'utf8'),
+    promptTokens: usage?.prompt_tokens ?? null,
+    completionTokens,
+    firstTokenMs: firstTokenMs !== null ? Number(firstTokenMs.toFixed(1)) : null,
+    generationMs: Number(generationMs.toFixed(1)),
+    tokensPerSec:
+      completionTokens && generationMs > 0
+        ? Number((completionTokens / (generationMs / 1000)).toFixed(1))
+        : null,
+    draftAccepted: timings?.draft_n_accepted ?? null,
+    draftProposed: timings?.draft_n ?? null,
+    totalMs: Number((performance.now() - totalStart).toFixed(1)),
+  };
+
+  if (WITH_TOOLS) {
+    // The record goes first so the viewer's reload (triggered by index.html) sees a complete folder.
+    fs.mkdirSync(TOOL_OUTPUT_DIR, { recursive: true });
+    fs.writeFileSync(path.join(TOOL_OUTPUT_DIR, 'run.json'), JSON.stringify(summary, null, 2), 'utf8');
+    fs.writeFileSync(outputPath, html, 'utf8');
+  }
+  console.log(STREAM ? JSON.stringify({ summary }) : JSON.stringify(summary, null, 2));
 }
 
 generateSlide().catch((err) => {

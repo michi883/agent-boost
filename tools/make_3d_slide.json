@@ -1,0 +1,22 @@
+{
+  "name": "make_3d_slide",
+  "description": "Render a roadmap or timeline slide as an interactive 3D visualization. Returns a complete HTML page.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "title": { "type": "string", "description": "Short slide title" },
+      "subtitle": { "type": "string", "description": "One-line subtitle" },
+      "milestones": {
+        "type": "array",
+        "description": "In order, one per period (e.g. 4 quarters)",
+        "minItems": 2,
+        "maxItems": 8,
+        "items": {
+          "type": "string",
+          "description": "Label | 1-2 word theme | three 2-3 word points, e.g. \"Q1 | Theme | point | point | point\""
+        }
+      }
+    },
+    "required": ["title", "subtitle", "milestones"]
+  }
+}

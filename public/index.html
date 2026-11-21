@@ -11,11 +11,29 @@
   <div class="app">
     <header class="topbar">
       <h1 class="brand">Agent Boost</h1>
-      <form id="neon-form" class="neon-form">
-        <input id="neon-prompt" class="neon-prompt" type="text" value="Integrate 3D visualization" maxlength="500" aria-label="Prompt for Gemini Neon" required>
-        <button id="neon-button" class="neon-button" type="submit">Improve with Neon</button>
-        <span id="neon-status" class="neon-status" data-state="idle" aria-live="polite"></span>
-      </form>
+      <ol class="steps" aria-label="Demo steps">
+        <li class="step" data-step="slide" data-state="idle">
+          <button class="step-button" type="button">
+            <span class="step-num">1</span>
+            <span class="step-text"><span class="step-name">Gemma creates slide</span><span class="step-status" aria-live="polite"></span></span>
+          </button>
+        </li>
+        <li class="step" data-step="build" data-state="idle">
+          <form id="neon-form" class="step-form">
+            <input id="neon-prompt" class="neon-prompt" type="text" value="Integrate 3D visualization" maxlength="500" aria-label="Prompt for Gemini" required>
+            <button class="step-button" type="submit">
+              <span class="step-num">2</span>
+              <span class="step-text"><span class="step-name">Gemini builds tool</span><span class="step-status" aria-live="polite"></span></span>
+            </button>
+          </form>
+        </li>
+        <li class="step" data-step="tool" data-state="idle">
+          <button class="step-button" type="button">
+            <span class="step-num">3</span>
+            <span class="step-text"><span class="step-name">Gemma uses tool</span><span class="step-status" aria-live="polite"></span></span>
+          </button>
+        </li>
+      </ol>
     </header>
 
     <main class="stage">
@@ -31,22 +49,30 @@
               <p class="placeholder-title">Waiting for Gemma</p>
             </div>
             <iframe class="slide-frame" title="Original slide" sandbox="allow-scripts allow-same-origin" hidden></iframe>
+            <div class="live" hidden>
+              <p class="live-head"></p>
+              <ol class="live-steps"></ol>
+            </div>
           </div>
         </div>
       </section>
 
-      <section class="panel" data-panel="improved" data-src="/gemini/index.html">
+      <section class="panel" data-panel="tool" data-src="/gemma-tool/index.html">
         <div class="panel-inner">
           <div class="panel-label">
-            <span class="panel-title">Improved <span class="panel-model">Gemini Neon</span></span>
+            <span class="panel-title">Gemma + New Tool <span class="panel-model">Gemma 31B + Gemini's tool</span></span>
             <span class="status-badge" data-state="empty">Waiting</span>
           </div>
           <div class="slide-viewport" data-state="empty">
             <div class="slide-placeholder" role="status" aria-live="polite">
               <span class="status-dot" aria-hidden="true"></span>
-              <p class="placeholder-title">Waiting for Gemini</p>
+              <p class="placeholder-title">Waiting for Gemma + tool</p>
             </div>
-            <iframe class="slide-frame" title="Improved slide" sandbox="allow-scripts allow-same-origin" hidden></iframe>
+            <iframe class="slide-frame" title="Slide made with the new tool" sandbox="allow-scripts allow-same-origin" hidden></iframe>
+            <div class="live" hidden>
+              <p class="live-head"></p>
+              <ol class="live-steps"></ol>
+            </div>
           </div>
         </div>
       </section>

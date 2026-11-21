@@ -38,29 +38,54 @@ body {
   display: flex;
   align-items: center;
   gap: 16px;
-  min-height: 32px;
+  min-height: 40px;
 }
 
-.neon-form {
-  flex: 0 1 600px;
+.steps {
+  flex: 0 1 auto;
   min-width: 0;
-  margin-left: auto;
+  margin: 0 0 0 auto;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.step {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Connector between steps. */
+.step + .step::before {
+  content: "";
+  flex: 0 0 16px;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.step-form {
+  min-width: 0;
+  margin: 0;
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
 .neon-prompt {
-  flex: 1 1 auto;
-  min-width: 0;
-  height: 32px;
+  flex: 0 1 220px;
+  min-width: 80px;
+  height: 40px;
   padding: 0 12px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.05);
   color: #f3f6fc;
   font: inherit;
-  font-size: 0.875rem;
+  font-size: 0.85rem;
 }
 
 .neon-prompt:focus {
@@ -68,58 +93,90 @@ body {
   outline-offset: 1px;
 }
 
-.neon-button {
+.step-button {
   flex: 0 0 auto;
-  height: 32px;
-  padding: 0 14px;
-  border: 0;
-  border-radius: 8px;
-  background: #3b82f6;
-  color: #ffffff;
+  height: 40px;
+  padding: 0 14px 0 6px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #f3f6fc;
   font: inherit;
-  font-size: 0.875rem;
-  font-weight: 600;
+  text-align: left;
   cursor: pointer;
-  white-space: nowrap;
 }
 
-.neon-button:hover:not(:disabled) {
-  background: #2563eb;
+.step-button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
 }
 
-.neon-button:disabled,
+.step-button:disabled,
 .neon-prompt:disabled {
-  opacity: 0.55;
+  opacity: 0.5;
   cursor: default;
 }
 
-.neon-status {
-  flex: 0 0 150px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  overflow: hidden;
+.step[data-state="running"] .step-button {
+  opacity: 1;
+  border-color: rgba(96, 165, 250, 0.6);
+}
+
+.step-num {
+  flex: 0 0 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
   font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.step[data-state="running"] .step-num {
+  background: #3b82f6;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.step[data-state="done"] .step-num {
+  background: #16a34a;
+}
+
+.step[data-state="error"] .step-num {
+  background: #dc2626;
+}
+
+.step-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.step-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.step-status {
+  max-width: 170px;
+  min-height: 1.2em;
+  overflow: hidden;
+  font-size: 0.72rem;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   text-overflow: ellipsis;
   color: #9aa7bd;
 }
 
-.neon-status[data-state="running"]::before {
-  content: "";
-  flex: 0 0 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #60a5fa;
-  animation: pulse 1s ease-in-out infinite;
-}
-
-.neon-status[data-state="done"] {
+.step[data-state="done"] .step-status {
   color: #8be9b5;
 }
 
-.neon-status[data-state="error"] {
+.step[data-state="error"] .step-status {
   color: #fca5a5;
 }
 
@@ -259,4 +316,74 @@ body {
   border: 0;
   transform-origin: 0 0;
   background: #0b1220;
+}
+
+/* Live progress over a slide viewport: milestones from Gemma's output and from Gemini's build. */
+.live {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 22px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(96, 165, 250, 0.08) 0%, transparent 60%),
+    #0d1220;
+}
+
+.live-head {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #f3f6fc;
+}
+
+/* Bottom-anchored: the newest milestone stays visible, older ones move up and off the top. */
+.live-steps {
+  flex: 1 1 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.live-steps li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: #cbd5e1;
+}
+
+.live-steps li::before {
+  content: "✓";
+  flex: 0 0 12px;
+  font-weight: 700;
+  color: #4ade80;
+}
+
+.live-steps li.current::before {
+  content: "●";
+  color: #60a5fa;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.live-steps li.failed::before {
+  content: "✕";
+  color: #f87171;
+}
+
+.live-steps time {
+  flex: 0 0 44px;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: #8b99b0;
 }
