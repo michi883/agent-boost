@@ -1,0 +1,11 @@
+{
+  "name": "agent-boost",
+  "private": true,
+  "description": "Gemma creates a slide, Gemini builds it a 3D tool, Gemma uses the tool.",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "three": "0.170.0"
+  }
+}

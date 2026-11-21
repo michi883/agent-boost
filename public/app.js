@@ -23,16 +23,17 @@
     panel.placeholder.hidden = Boolean(signature);
   }
 
-  // --- Three steps: Gemma creates a slide -> Gemini builds a tool -> Gemma retries with it ---
+  // --- Three steps: Gemma creates a slide -> Gemini builds a tool from the user's request -> Gemma uses it ---
   // The server runs Gemma (llama.cpp) and Gemini (agy); the browser only starts steps and shows their progress.
   const steps = Object.fromEntries(
     ['slide', 'build', 'tool'].map((name) => {
       const el = document.querySelector(`[data-step="${name}"]`);
       const $ = (selector) => el.querySelector(selector);
-      return [name, { el, button: $('button'), sub: $('.step-sub'), status: $('.step-status') }];
+      return [name, { el, start: $('.step-start'), sub: $('.step-sub'), status: $('.step-status') }];
     })
   );
-  const GEMINI_PROMPT = steps.build.el.dataset.prompt;
+  const buildForm = document.getElementById('build-form');
+  const requestInput = document.getElementById('build-request');
   const hint = document.getElementById('hint');
   const toolCtx = document.getElementById('tool-ctx');
 
@@ -42,26 +43,35 @@
 
   // ready: the step's result exists (also after a server restart, when its job is idle again).
   function stepState(job, ready) {
-    if (job.state === 'running' || job.state === 'error') return job.state;
+    if (['running', 'error', 'rejected'].includes(job.state)) return job.state;
     return job.state === 'done' || ready ? 'done' : 'idle';
   }
 
-  function setStep(name, { state, sub, next, disabled, job }) {
+  const STATUS = { error: 'Failed', rejected: 'Not supported' };
+
+  function setStep(name, { state, job, next, canStart, sub, phase }) {
     const s = steps[name];
     s.el.dataset.state = state;
     s.el.classList.toggle('next', next);
-    s.button.disabled = disabled;
-    s.sub.textContent = sub;
-    s.sub.title = sub;
-    s.status.textContent =
-      state === 'running' || (state === 'done' && job.state === 'done') ? elapsed(job) : state === 'error' ? 'Retry' : next ? 'Start' : '';
+    s.start.hidden = state === 'running';
+    s.start.disabled = !canStart;
+    if (s.sub) {
+      s.sub.textContent = sub;
+      s.sub.title = sub;
+    }
+    let status = STATUS[state] || '';
+    if (state === 'running') status = phase ? `${phase} · ${elapsed(job)}` : elapsed(job);
+    else if (state === 'done') status = job.state === 'done' ? elapsed(job) : 'Done';
+    s.status.textContent = status;
+    s.status.title = state === 'error' || state === 'rejected' ? job.error : status;
   }
 
   // --- Live progress inside a slide viewport ---
   const live = Object.fromEntries(
     panels.map((panel) => {
       const el = panel.viewport.querySelector('.live');
-      return [panel.key, { el, head: el.querySelector('.live-head'), phases: el.querySelector('.live-phases'), list: el.querySelector('.live-steps'), key: '' }];
+      const $ = (selector) => el.querySelector(selector);
+      return [panel.key, { el, head: $('.live-head'), sub: $('.live-sub'), phases: $('.live-phases'), list: $('.live-steps'), key: '' }];
     })
   );
 
@@ -69,12 +79,15 @@
     const v = live[key];
     v.el.hidden = !view;
     if (!view) return;
-    const { job, owner, head, phases } = view;
+    const { job, owner, head, sub, phases } = view;
     v.el.dataset.owner = owner;
     v.el.classList.toggle('running', job.state === 'running');
     v.head.textContent = head;
+    v.sub.hidden = !sub;
+    v.sub.textContent = sub || '';
+    v.sub.title = sub || '';
     const rows = [...(job.steps || [])];
-    if (job.state === 'error') rows.push({ at: job.finishedAt - job.startedAt, text: `Failed: ${job.error}`, failed: true });
+    if (job.state === 'error') rows.push({ at: job.finishedAt - job.startedAt, text: `Failed: ${job.error}` });
     const signature = JSON.stringify([job.startedAt, job.state, rows.length, rows[rows.length - 1]?.text, phases]);
     if (signature === v.key) return;
     v.key = signature;
@@ -85,7 +98,7 @@
     v.list.replaceChildren(
       ...rows.map((row, i) => {
         const li = document.createElement('li');
-        if (row.failed) li.className = 'failed';
+        if (/^(Failed|Test failed|Not supported)/.test(row.text)) li.className = 'failed';
         else if (job.state === 'running' && i === rows.length - 1) li.className = 'current';
         li.append(Object.assign(document.createElement('time'), { textContent: seconds(row.at) }), row.text);
         return li;
@@ -100,7 +113,7 @@
       ['Think', Boolean(neon.plan)],
       ['Plan', Boolean(neon.plan)],
       [neon.lines ? `Code · ${neon.lines} lines` : 'Code', has('Code complete')],
-      [neon.steps.some((row) => row.text.startsWith('Repair')) ? 'Test · repaired' : 'Test', has('Test passed') || has('Browser test skipped')],
+      [has('Repair') ? 'Test · repaired' : 'Test', has('Test passed') || has('Browser test skipped')],
       ['Install', has('Installed')],
     ];
     const current = stages.findIndex(([, done]) => !done);
@@ -108,7 +121,7 @@
     return stages.map(([text, done], i) => ({ text, state: done ? 'done' : i === current ? active : '' }));
   }
 
-  const BUILD_PHASES = { starting: 'Starting…', thinking: 'Thinking…', testing: 'Testing the tool…', repairing: 'Fixing a failed test…' };
+  const BUILD_PHASES = { starting: 'Starting', thinking: 'Thinking', 'writing code': 'Writing code', testing: 'Testing', repairing: 'Fixing' };
 
   let status = { gemma: { slide: { state: 'idle' }, tool: { state: 'idle' } }, neon: { state: 'idle', steps: [] }, tools: [] };
   let ticker = null;
@@ -121,17 +134,16 @@
     const hasOriginal = Boolean(status.original);
     const hasTool = tools.length > 0;
     const hasResult = Boolean(status.tool);
-    const gemmaBusy = original.state === 'running' || retry.state === 'running';
-    const busy = gemmaBusy || neon.state === 'running';
+    const busy = original.state === 'running' || retry.state === 'running' || neon.state === 'running';
     const next = busy ? null : !hasOriginal ? 'slide' : !hasTool ? 'build' : !hasResult ? 'tool' : null;
 
-    // Step 1
+    // Step 1 (starting it begins a new demo)
     const s1 = stepState(original, hasOriginal);
     setStep('slide', {
       state: s1,
       job: original,
       next: next === 'slide',
-      disabled: busy,
+      canStart: !busy,
       sub: s1 === 'running' ? lastStep(original, 'Writing…') : s1 === 'error' ? original.error : `“${GEMMA_REQUEST}”`,
     });
 
@@ -141,14 +153,10 @@
       state: s2,
       job: neon,
       next: next === 'build',
-      disabled: busy || !hasOriginal,
-      sub:
-        s2 === 'running'
-          ? neon.phase === 'writing code' ? `Writing code · ${neon.lines} lines` : BUILD_PHASES[neon.phase] || 'Working…'
-          : s2 === 'error' ? neon.error
-          : s2 === 'done' ? 'make_3d_slide() tested and installed'
-          : `“${GEMINI_PROMPT}”`,
+      canStart: !busy && hasOriginal && requestInput.value.trim().length > 0,
+      phase: neon.phase === 'writing code' ? `Code ${neon.lines} lines` : BUILD_PHASES[neon.phase],
     });
+    requestInput.disabled = neon.state === 'running';
 
     // Step 3
     const calls = retry.summary?.toolCalls || [];
@@ -158,7 +166,7 @@
       state: s3,
       job: retry,
       next: next === 'tool',
-      disabled: busy || !hasTool || !hasOriginal,
+      canStart: !busy && hasTool && hasOriginal,
       sub:
         s3 === 'running' ? lastStep(retry, 'Deciding…')
           : s3 === 'error' ? retry.error
@@ -166,20 +174,25 @@
             ? calls.length
               ? `Called make_3d_slide() · ${differences?.length ? `${differences.length} text changes` : 'same text ✓'}`
               : 'Answered without the tool'
-          : hasTool ? 'Same request · Gemma decides whether to use it'
+          : hasTool ? 'Same slide request · Gemma decides whether to use the tool'
           : 'Needs the tool from step 2',
     });
 
     toolCtx.textContent = hasTool || neon.state !== 'idle' ? `tool built by ${model}${neon.state === 'done' ? ` in ${elapsed(neon)}` : ''}` : `tool to be built by ${model}`;
 
-    // Live progress: left while Gemma writes the original; right while Gemini builds or Gemma retries.
+    // Live progress: left while Gemma writes the original; right while Gemini builds or Gemma uses the tool.
     const slideLive = original.state === 'running' || (original.state === 'error' && !hasOriginal);
     showLive('original', slideLive && { job: original, owner: 'gemma', head: 'Gemma 31B is writing the slide' });
     if (retry.state === 'running' || (retry.state === 'error' && !hasResult)) {
-      showLive('tool', { job: retry, owner: 'gemma', head: 'Gemma 31B retries, now with make_3d_slide() available' });
+      showLive('tool', { job: retry, owner: 'gemma', head: 'Gemma 31B redoes its slide, now with make_3d_slide() available' });
     } else if (!hasResult && neon.state !== 'idle') {
-      const head = neon.state === 'running' ? `${model} is building make_3d_slide()` : `${model} built make_3d_slide()`;
-      showLive('tool', { job: neon, owner: 'gemini', head, phases: geminiPhases(neon) });
+      const head = {
+        running: `${model} is building make_3d_slide()`,
+        done: `${model} built make_3d_slide()`,
+        rejected: `${model} declined the request`,
+        error: `${model} could not build a working tool`,
+      }[neon.state];
+      showLive('tool', { job: neon, owner: 'gemini', head, sub: neon.request && `Request: “${neon.request}”`, phases: neon.state !== 'rejected' && geminiPhases(neon) });
     } else {
       showLive('tool', null);
     }
@@ -197,15 +210,18 @@
     let text;
     let error = false;
     if (original.state === 'running') text = 'Gemma 31B is writing the slide on this laptop.';
-    else if (neon.state === 'running') text = `${model} writes make_3d_slide(), a reusable tool that turns a roadmap into an interactive 3D slide. The server tests it before Gemma can use it.`;
-    else if (retry.state === 'running') text = 'Gemma retries the same request. It now sees make_3d_slide() among its tools and decides on its own whether to call it.';
-    else if (original.state === 'error' || neon.state === 'error' || retry.state === 'error') {
+    else if (neon.state === 'running') text = `${model} is designing make_3d_slide() from your request. The server tests it in a browser before Gemma can use it.`;
+    else if (retry.state === 'running') text = 'Gemma redoes its slide. It now sees make_3d_slide() among its tools and decides on its own whether to call it.';
+    else if (neon.state === 'rejected') {
+      text = `${model} declined: ${neon.error} Edit the request in step 2 and start it again.`;
+      error = true;
+    } else if (original.state === 'error' || neon.state === 'error' || retry.state === 'error') {
       const [step, job] = original.state === 'error' ? [1, original] : neon.state === 'error' ? [2, neon] : [3, retry];
-      text = `Step ${step} failed: ${job.error}. Click it to try again.`;
+      text = `Step ${step} failed: ${job.error}. Start it again.`;
       error = true;
     } else if (!hasOriginal) text = 'Start with step 1: Gemma 31B, running locally on this laptop, makes a slide from a one-line request.';
-    else if (!hasTool) text = `Gemma's slide is flat. Step 2: ${model} builds Gemma a reusable tool that renders roadmaps in interactive 3D.`;
-    else if (!hasResult) text = 'The tool is tested and installed. Step 3: Gemma retries the same request and can now choose to use it.';
+    else if (!hasTool) text = `Gemma's slide is flat. Step 2: say what tool you want; ${model} designs and builds it for Gemma.`;
+    else if (!hasResult) text = 'The tool is tested and installed. Step 3: Gemma redoes its slide and can now choose to use the tool.';
     else if (retry.state !== 'done') text = 'Drag the 3D slide to orbit it.';
     else if (!calls.length) text = 'Gemma answered without calling the tool.';
     else if (differences?.length) text = `Gemma called make_3d_slide() itself, with ${differences.length} text changes from its original slide. Drag the 3D slide to orbit it.`;
@@ -224,7 +240,7 @@
   }
 
   async function start(name, url, body) {
-    steps[name].button.disabled = true;
+    steps[name].start.disabled = true;
     try {
       const response = await fetch(url, {
         method: 'POST',
@@ -239,9 +255,13 @@
     }
   }
 
-  steps.slide.button.addEventListener('click', () => start('slide', '/api/gemma', { withTools: false }));
-  steps.build.button.addEventListener('click', () => start('build', '/api/improve', { prompt: GEMINI_PROMPT }));
-  steps.tool.button.addEventListener('click', () => start('tool', '/api/gemma', { withTools: true }));
+  steps.slide.start.addEventListener('click', () => start('slide', '/api/gemma', { withTools: false }));
+  steps.tool.start.addEventListener('click', () => start('tool', '/api/gemma', { withTools: true }));
+  buildForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    start('build', '/api/improve', { prompt: requestInput.value.trim() });
+  });
+  requestInput.addEventListener('input', render);
 
   async function poll() {
     try {

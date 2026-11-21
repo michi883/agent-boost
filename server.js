@@ -22,6 +22,7 @@ const MIME_TYPES = {
   '.jpeg': 'image/jpeg',
   '.webp': 'image/webp',
   '.ico': 'image/x-icon',
+  '.wasm': 'application/wasm',
   '.txt': 'text/plain; charset=utf-8',
 };
 
@@ -31,6 +32,18 @@ function sendText(res, statusCode, message) {
     'X-Content-Type-Options': 'nosniff',
   });
   res.end(message);
+}
+
+// Three.js is served from the local npm install (no venue Wi-Fi needed): only its build/ and examples/jsm/ folders.
+const THREE_DIR = path.join(__dirname, 'node_modules', 'three');
+
+// Maps a URL path to the folder it is served from: public/, local Three.js, or the tool-test page.
+function staticRoot(segments) {
+  if (segments[0] === 'vendor' && segments[1] === 'three' && (segments[2] === 'build' || (segments[2] === 'examples' && segments[3] === 'jsm'))) {
+    return { root: THREE_DIR, relative: segments.slice(2), cache: true };
+  }
+  if (segments.join('/') === 'tool-test/page.html') return { root: TEST_DIR, relative: ['page.html'] };
+  return { root: PUBLIC_DIR, relative: segments.length === 0 ? ['index.html'] : segments };
 }
 
 function resolvePublicFile(requestUrl) {
@@ -54,10 +67,16 @@ function resolvePublicFile(requestUrl) {
     return { error: 404 };
   }
 
-  const relativePath = segments.length === 0 ? 'index.html' : segments.join('/');
-  const candidatePath = path.resolve(PUBLIC_DIR, relativePath);
+  const { root: rootPath, relative, cache } = staticRoot(segments);
+  let root;
+  try {
+    root = fs.realpathSync(rootPath);
+  } catch {
+    return { error: 404 };
+  }
+  const candidatePath = path.resolve(root, relative.join('/'));
 
-  if (!candidatePath.startsWith(PUBLIC_DIR + path.sep)) {
+  if (!candidatePath.startsWith(root + path.sep)) {
     return { error: 404 };
   }
 
@@ -68,7 +87,7 @@ function resolvePublicFile(requestUrl) {
     return { error: 404 };
   }
 
-  if (!realPath.startsWith(PUBLIC_DIR + path.sep)) {
+  if (!realPath.startsWith(root + path.sep)) {
     return { error: 404 };
   }
 
@@ -83,7 +102,7 @@ function resolvePublicFile(requestUrl) {
     return { error: 404 };
   }
 
-  return { filePath: realPath };
+  return { filePath: realPath, cache };
 }
 
 // Files the viewer watches. A signature changes whenever the content is rewritten.
@@ -174,11 +193,49 @@ const CODE_MILESTONES = [
   [/Raycaster|pointermove|mousemove/, 'Adds hover feedback'],
   [/requestAnimationFrame|setAnimationLoop/, 'Animates the scene'],
 ];
-const TOOL_TEST = `const html = require(process.argv[1])({ title: 'Test Plan', subtitle: 'Smoke test',
-  milestones: ['Phase 1 | Research | a b | c d | e f', 'Phase 2 | Build | g h | i j'] });
+// A different topic than the demo, with uneven point counts, to check the tool is generic and shows all text.
+const TOOL_SAMPLE = {
+  title: 'Product Launch Plan',
+  subtitle: 'Smoke test for make_3d_slide',
+  milestones: [
+    'Phase 1 | Research | User interviews | Market scan | Pricing study',
+    'Phase 2 | Build | Core features | Beta program',
+    'Phase 3 | Launch | Press tour | Partner deals | Sales push',
+    'Phase 4 | Expand | New regions | Channel sales | Support team',
+  ],
+};
+const SAMPLE_TEXT = [TOOL_SAMPLE.title, TOOL_SAMPLE.subtitle, ...TOOL_SAMPLE.milestones.flatMap((m) => m.split('|').map((part) => part.trim()))];
+const TOOL_TEST = `const html = require(process.argv[1])(JSON.parse(process.argv[3]));
 if (typeof html !== 'string' || !/<html[\\s>]/i.test(html)) throw new Error('it did not return an HTML page');
 require('fs').writeFileSync(process.argv[2], html);`;
-// The returned page is then loaded once in headless Chrome; uncaught errors or no <canvas> fail the test.
+// The returned page is then loaded once in headless Chrome from this server, with every other host blocked.
+// This probe (added to the test copy only) measures each text item at the first view: overlapping, cut off, hidden.
+const LAYOUT_PROBE = `<script>setTimeout(() => {
+  const want = new Set(${JSON.stringify(SAMPLE_TEXT)});
+  const items = [...document.querySelectorAll('body *')].filter((el) => !el.children.length && want.has(el.textContent.trim()))
+    .map((el) => ({ el, text: el.textContent.trim(), r: el.getBoundingClientRect() }));
+  const issues = [];
+  for (const a of items) {
+    if (a.r.width < 1 || a.r.height < 1) issues.push('"' + a.text + '" is not visible');
+    else if (a.r.left < -1 || a.r.top < -1 || a.r.right > innerWidth + 1 || a.r.bottom > innerHeight + 1) issues.push('"' + a.text + '" is cut off at the edge');
+  }
+  // Each text item's card: its nearest ancestor with a background, border or shadow. Different cards must not overlap.
+  const cardOf = (el) => {
+    for (let node = el; node && node !== document.body; node = node.parentElement) {
+      const cs = getComputedStyle(node);
+      if (!/rgba\\(0, 0, 0, 0\\)|transparent/.test(cs.backgroundColor) || cs.borderTopWidth !== '0px' || cs.boxShadow !== 'none') return node;
+    }
+    return el;
+  };
+  const boxes = [...new Set(items.map((item) => cardOf(item.el)))].map((card) => ({ card, r: card.getBoundingClientRect(), text: items.find((item) => card.contains(item.el)).text }));
+  const overlap = (a, b) => Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) * Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+  for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+    const a = boxes[i], b = boxes[j];
+    if (a.card.contains(b.card) || b.card.contains(a.card)) continue;
+    if (overlap(a.r, b.r) > 0.03 * Math.min(a.r.width * a.r.height, b.r.width * b.r.height)) issues.push('the card with "' + a.text + '" overlaps the card with "' + b.text + '"');
+  }
+  document.documentElement.setAttribute('data-layout-issues', JSON.stringify(issues));
+}, 3000);</script>`;
 const CHROME_BIN = process.env.CHROME_BIN || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const TEST_DIR = path.join(os.tmpdir(), 'agent-boost-tool-test');
 const MAX_REPAIRS = 2;
@@ -187,7 +244,7 @@ const MAX_REPAIRS = 2;
 const modelLabel = (id) =>
   id.replace(/-(low|medium|high|xhigh)$/, (_, level) => ` (${level === 'xhigh' ? 'XHigh' : level[0].toUpperCase() + level.slice(1)})`)
     .split('-').map((word) => word[0].toUpperCase() + word.slice(1)).join(' ');
-const neon = { state: 'idle', model: NEON_MODEL, modelName: modelLabel(NEON_MODEL), phase: null, plan: null, lines: 0, startedAt: null, finishedAt: null, error: null, steps: [] };
+const neon = { state: 'idle', request: null, model: NEON_MODEL, modelName: modelLabel(NEON_MODEL), phase: null, plan: null, lines: 0, startedAt: null, finishedAt: null, error: null, steps: [] };
 let neonChild = null;
 
 function geminiPrompt(prompt) {
@@ -197,7 +254,7 @@ function geminiPrompt(prompt) {
   } catch {
     // No Gemma slide yet; the tool does not depend on it.
   }
-  return slide ? `${prompt}\n\nGemma's current slide (body markup):\n${slide}` : prompt;
+  return `User's request: ${prompt}${slide ? `\n\nGemma's current slide (body markup):\n${slide}` : ''}`;
 }
 
 const run = (file, args, options) =>
@@ -213,14 +270,19 @@ async function testAndInstall(reply, step) {
   fs.writeFileSync(CANDIDATE_FILE, match[1], 'utf8');
   try {
     step('Test: running the tool on a different topic');
-    const node = await run(process.execPath, ['-e', TOOL_TEST, CANDIDATE_FILE, page], { cwd: TOOLS_DIR, timeout: 10000 });
+    const node = await run(process.execPath, ['-e', TOOL_TEST, CANDIDATE_FILE, page, JSON.stringify(TOOL_SAMPLE)], { cwd: TOOLS_DIR, timeout: 10000 });
     if (node.error) return `Running the tool failed: ${(node.stderr.split('\n').find((l) => /Error/.test(l)) || node.error.message).trim().slice(0, 300)}`;
+    const html = fs.readFileSync(page, 'utf8');
+    const remote = html.match(/https?:\/\/(?!www\.w3\.org)[^\s"'<>)]+/);
+    if (remote) return `The page loads ${remote[0]} from the internet; use the local /vendor/three/ paths instead.`;
+    fs.writeFileSync(page, html.includes('</body>') ? html.replace('</body>', `${LAYOUT_PROBE}</body>`) : html + LAYOUT_PROBE);
 
     step('Test: rendering its page in a browser');
     const chrome = await run(CHROME_BIN, [
       '--headless=new', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--enable-logging=stderr', '--v=0',
-      '--virtual-time-budget=4000', '--window-size=1280,720', `--user-data-dir=${path.join(TEST_DIR, 'profile')}`,
-      '--dump-dom', `file://${page}`,
+      '--virtual-time-budget=5000', '--window-size=1280,720', `--user-data-dir=${path.join(TEST_DIR, 'profile')}`,
+      `--host-resolver-rules=MAP * ~NOTFOUND , EXCLUDE ${HOST}`,
+      '--dump-dom', `http://${HOST}:${PORT}/tool-test/page.html`,
     ], { timeout: 30000 });
     if (chrome.error?.code === 'ENOENT') {
       step('Browser test skipped: Chrome not found');
@@ -228,7 +290,14 @@ async function testAndInstall(reply, step) {
       const uncaught = chrome.stderr.match(/CONSOLE:(\d+)\] "(Uncaught[^"]*)"/);
       if (uncaught) return `The page threw "${uncaught[2]}" (line ${uncaught[1]} of the returned HTML).`;
       if (!/<canvas/i.test(chrome.stdout)) return 'The page rendered no <canvas> (no 3D scene).';
-      step('Test passed: the page renders a 3D scene without errors');
+      const missing = SAMPLE_TEXT.filter((text) => !chrome.stdout.includes(text));
+      if (missing.length) return `The page does not show this input text: ${missing.map((t) => `"${t}"`).join(', ')}. Show every title, subtitle, label, theme and point exactly as given.`;
+      const probe = chrome.stdout.match(/data-layout-issues="([^"]*)"/);
+      const issues = probe ? JSON.parse(probe[1].replace(/&quot;/g, '"').replace(/&amp;/g, '&')) : [];
+      if (issues.length) {
+        return `At the first view, text is unreadable: ${issues.slice(0, 4).join('; ')}. Keep every label card fully inside the frame and apart from the others.`;
+      }
+      step('Test passed: renders in 3D, offline, with all text readable');
     }
     fs.renameSync(CANDIDATE_FILE, TOOL_FILE);
     step(`Installed ${path.relative(__dirname, TOOL_FILE)}: Gemma can now discover it`);
@@ -243,7 +312,7 @@ function startNeon(prompt) {
   for (const name of listTools()) fs.rmSync(path.join(TOOLS_DIR, `${name}.js`), { force: true });
   fs.rmSync(TOOL_OUTPUT_DIR, { recursive: true, force: true });
   Object.assign(gemma.tool, idleJob());
-  Object.assign(neon, { state: 'running', phase: 'starting', plan: null, lines: 0, startedAt: Date.now(), finishedAt: null, error: null, steps: [] });
+  Object.assign(neon, { state: 'running', request: prompt, phase: 'starting', plan: null, lines: 0, startedAt: Date.now(), finishedAt: null, error: null, steps: [] });
 
   const child = spawn(AGY_BIN, ['acp'], { cwd: __dirname, stdio: ['pipe', 'pipe', 'pipe'] });
   neonChild = child;
@@ -326,14 +395,15 @@ function startNeon(prompt) {
     stderrTail = (stderrTail + chunk).slice(-2000);
   });
 
-  const finish = (error) => {
+  // rejected: Gemini judged the request outside what the fixed tool interface can do (see AGENTS.md).
+  const finish = (error, rejected) => {
     if (neonChild !== child) return;
     neonChild = null;
     clearTimeout(timer);
     child.kill('SIGTERM');
-    if (!error && listTools().length === 0) error = 'Gemini finished without adding a tool to tools/';
-    Object.assign(neon, { state: error ? 'error' : 'done', phase: null, finishedAt: Date.now(), error });
-    log(error ? `error: ${error}\n${stderrTail}` : `installed ${path.relative(__dirname, TOOL_FILE)}`);
+    if (!error && !rejected && listTools().length === 0) error = 'Gemini finished without adding a tool to tools/';
+    Object.assign(neon, { state: rejected ? 'rejected' : error ? 'error' : 'done', phase: null, finishedAt: Date.now(), error: rejected || error });
+    log(rejected ? `declined: ${rejected}` : error ? `error: ${error}\n${stderrTail}` : `installed ${path.relative(__dirname, TOOL_FILE)}`);
   };
   const timer = setTimeout(() => finish(`Timed out after ${NEON_TIMEOUT_MS / 1000} s`), NEON_TIMEOUT_MS);
   child.on('error', (err) => finish(`Could not start agy (${err.code || err.message})`));
@@ -353,6 +423,12 @@ function startNeon(prompt) {
       reply = '';
       const result = await request('session/prompt', { sessionId, prompt: [{ type: 'text', text }] });
       log(`reply done ${result?.stopReason} ${JSON.stringify(result?.usage || {})}`);
+      const declined = reply.trim().match(/^UNSUPPORTED:\s*(.*)/);
+      if (declined) {
+        const reason = declined[1].trim().slice(0, 300) || 'no reason given';
+        step(`Not supported: ${reason}`);
+        return reason;
+      }
       const failure = await testAndInstall(reply, step);
       if (!failure) break;
       step(`Test failed: ${failure}`);
@@ -362,8 +438,9 @@ function startNeon(prompt) {
       neon.phase = 'repairing';
       text = `Testing your tool failed: ${failure}\nFix it. Reply with the complete corrected tools/make_3d_slide.js in a single \`\`\`js block.`;
     }
+    return null;
   })().then(
-    () => finish(null),
+    (rejected) => finish(null, rejected),
     (err) => finish(err.message)
   );
 }
@@ -396,7 +473,7 @@ function startGemma(kind) {
     fs.rmSync(ORIGINAL_FILE, { force: true });
     for (const name of listTools()) fs.rmSync(path.join(TOOLS_DIR, `${name}.js`), { force: true });
     Object.assign(gemma.tool, idleJob());
-    Object.assign(neon, { state: 'idle', phase: null, plan: null, lines: 0, startedAt: null, finishedAt: null, error: null, steps: [] });
+    Object.assign(neon, { state: 'idle', request: null, phase: null, plan: null, lines: 0, startedAt: null, finishedAt: null, error: null, steps: [] });
   }
   Object.assign(job, { ...idleJob(), state: 'running', startedAt: Date.now() });
 
@@ -549,7 +626,7 @@ const server = http.createServer((req, res) => {
       'Content-Type': contentType,
       'Content-Length': data.length,
       'X-Content-Type-Options': 'nosniff',
-      'Cache-Control': 'no-store',
+      'Cache-Control': result.cache ? 'public, max-age=86400' : 'no-store',
     });
 
     if (req.method === 'HEAD') {

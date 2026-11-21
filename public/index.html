@@ -17,27 +17,33 @@
 
     <ol class="steps" aria-label="Demo steps">
       <li class="step" data-step="slide" data-owner="gemma" data-state="idle">
-        <button class="step-card" type="button">
+        <div class="step-card">
           <span class="step-num">1</span>
-          <span class="step-text"><span class="step-title">Gemma creates a slide</span><span class="step-sub"></span></span>
+          <div class="step-text"><span class="step-title">Gemma creates a slide</span><span class="step-sub"></span></div>
           <span class="step-status" aria-live="polite"></span>
-        </button>
+          <button class="step-start" type="button">Start</button>
+        </div>
       </li>
       <li class="step-arrow" aria-hidden="true"></li>
-      <li class="step" data-step="build" data-owner="gemini" data-state="idle" data-prompt="Integrate 3D visualization">
-        <button class="step-card" type="button">
+      <li class="step" data-step="build" data-owner="gemini" data-state="idle">
+        <form class="step-card" id="build-form">
           <span class="step-num">2</span>
-          <span class="step-text"><span class="step-title">Gemini builds Gemma a tool</span><span class="step-sub"></span></span>
+          <div class="step-text">
+            <span class="step-title">Gemini builds Gemma a tool</span>
+            <input id="build-request" class="step-input" type="text" value="Add interactive 3D visualization to slides" maxlength="500" required aria-label="Your request for Gemini's tool">
+          </div>
           <span class="step-status" aria-live="polite"></span>
-        </button>
+          <button class="step-start" type="submit">Start</button>
+        </form>
       </li>
       <li class="step-arrow" aria-hidden="true"></li>
       <li class="step" data-step="tool" data-owner="gemma" data-state="idle">
-        <button class="step-card" type="button">
+        <div class="step-card">
           <span class="step-num">3</span>
-          <span class="step-text"><span class="step-title">Gemma retries with the tool</span><span class="step-sub"></span></span>
+          <div class="step-text"><span class="step-title">Gemma uses the tool</span><span class="step-sub"></span></div>
           <span class="step-status" aria-live="polite"></span>
-        </button>
+          <button class="step-start" type="button">Start</button>
+        </div>
       </li>
     </ol>
 
@@ -53,6 +59,7 @@
             <iframe class="slide-frame" title="Original slide" sandbox="allow-scripts allow-same-origin" hidden></iframe>
             <div class="live" data-owner="gemma" hidden>
               <p class="live-head"></p>
+              <p class="live-sub" hidden></p>
               <ol class="live-phases" hidden></ol>
               <ol class="live-steps"></ol>
             </div>
@@ -71,6 +78,7 @@
             <iframe class="slide-frame" title="Slide made with the new tool" sandbox="allow-scripts allow-same-origin" hidden></iframe>
             <div class="live" hidden>
               <p class="live-head"></p>
+              <p class="live-sub" hidden></p>
               <ol class="live-phases" hidden></ol>
               <ol class="live-steps"></ol>
             </div>
