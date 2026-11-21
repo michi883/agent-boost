@@ -40,4 +40,6 @@ module.exports = function make_3d_slide({ title, subtitle, milestones }) { retur
 - Use Three.js 0.170.0 via an import map, and nothing else:
   - `three` → `https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js`
   - `three/addons/` → `https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/`
+- Addons are named imports, not members of `THREE`: `import { OrbitControls } from 'three/addons/controls/OrbitControls.js'`,
+  `import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js'`, then `new CSS2DRenderer()`.
 - It must run without errors on first load.

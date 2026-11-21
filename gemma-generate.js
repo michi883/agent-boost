@@ -51,6 +51,38 @@ const SYSTEM_PROMPT =
 // With --tools, Gemma decides for itself whether a tool fits; the prompt never names one.
 const TOOL_SYSTEM_PROMPT =
   'You create slides. When a provided tool can make the requested slide, call it. Otherwise o' + SYSTEM_PROMPT.slice(1);
+// The retry continues the conversation that produced the original slide, so Gemma reuses its own content.
+const RETRY_PROMPT = 'Make the same slide again. You now have tools; keep exactly the same text.';
+
+function readOriginal() {
+  try {
+    return fs.readFileSync(RAW_OUTPUT_PATH, 'utf8').trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+// Text of the original slide (Gemma's own markup) vs. the text Gemma passed to the tool.
+function contentDifferences(raw, args) {
+  const decode = (s) => String(s ?? '').replace(/&(amp|lt|gt|quot|#39);/g, (_, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'" })[e]);
+  const norm = (s) => decode(s).replace(/\s+/g, ' ').trim();
+  const sections = [...raw.matchAll(/<section>([\s\S]*?)<\/section>/g)].map(([, html]) => ({
+    theme: html.match(/<h2>(.*?)<\/h2>/)?.[1],
+    points: [...html.matchAll(/<li>(.*?)<\/li>/g)].map((m) => norm(m[1])).join(' | '),
+  }));
+  const milestones = (Array.isArray(args.milestones) ? args.milestones : []).map((m) => String(m).split('|').map((x) => x.trim()));
+  const diffs = [];
+  const check = (what, before, after) => norm(before) !== norm(after) && diffs.push(`${what}: "${norm(before)}" → "${norm(after)}"`);
+  check('title', raw.match(/<h1>(.*?)<\/h1>/)?.[1], args.title);
+  check('subtitle', raw.match(/<header>[\s\S]*?<p>(.*?)<\/p>/)?.[1], args.subtitle);
+  if (milestones.length !== sections.length) diffs.push(`quarters: ${sections.length} → ${milestones.length}`);
+  sections.forEach((section, i) => {
+    const [, theme, ...points] = milestones[i] || [];
+    check(`Q${i + 1} theme`, section.theme, theme);
+    check(`Q${i + 1} points`, section.points, points.join(' | '));
+  });
+  return diffs;
+}
 
 // A tool is tools/<name>.json (OpenAI function schema: name, description, parameters) plus tools/<name>.js
 // (module.exports = (args) => complete HTML page). Tools are discovered on every run, so adding the files adds the tool.
@@ -95,6 +127,7 @@ async function generateSlide() {
   const totalStart = performance.now();
   const tools = WITH_TOOLS ? loadTools() : [];
   if (WITH_TOOLS && tools.length === 0) throw new Error('No tools installed in tools/');
+  const original = WITH_TOOLS ? readOriginal() : null;
   milestone(WITH_TOOLS ? `Same request, now offered: ${tools.map((tool) => tool.schema.name).join(', ')}` : 'Request sent to Gemma 31B');
 
   const response = await fetch(`${GEMMA_URL}/v1/chat/completions`, {
@@ -110,6 +143,7 @@ async function generateSlide() {
       messages: [
         { role: 'system', content: WITH_TOOLS ? TOOL_SYSTEM_PROMPT : SYSTEM_PROMPT },
         { role: 'user', content: DEMO_PROMPT },
+        ...(original ? [{ role: 'assistant', content: original }, { role: 'user', content: RETRY_PROMPT }] : []),
       ],
       ...(WITH_TOOLS && {
         tools: tools.map((tool) => ({ type: 'function', function: tool.schema })),
@@ -176,6 +210,7 @@ async function generateSlide() {
   const generationMs = performance.now() - totalStart;
   let html;
   let toolMs = null;
+  let differences = null;
   let outputPath = OUTPUT_PATH;
 
   if (!WITH_TOOLS) {
@@ -194,6 +229,10 @@ async function generateSlide() {
         args = JSON.parse(call.arguments);
       } catch {
         throw new Error(`Invalid JSON arguments in ${call.name} call: ${call.arguments}`);
+      }
+      if (original) {
+        differences = contentDifferences(original, args);
+        milestone(differences.length ? `Content differs from the original slide (${differences.length})` : 'Same text as the original slide');
       }
       const toolStart = performance.now();
       html = await tool.run(args);
@@ -216,6 +255,8 @@ async function generateSlide() {
       toolsOffered: tools.map((tool) => tool.schema.name),
       toolCalls, // exactly as Gemma emitted them (raw JSON arguments)
       toolMs: toolMs !== null ? Number(toolMs.toFixed(1)) : null,
+      continuedFromOriginal: Boolean(original),
+      contentDifferences: differences, // null when there was no tool call or no original to compare
     }),
     finishReason,
     bytes: Buffer.byteLength(html, 'utf8'),

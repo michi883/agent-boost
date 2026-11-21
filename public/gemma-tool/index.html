@@ -1,150 +1,178 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta charset="utf-8">
 <style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  html,body{width:100vw;height:100vh;overflow:hidden;background:radial-gradient(circle at 50% 35%,#131c36 0%,#070912 75%);color:#eef2ff;font-family:Inter,system-ui,-apple-system,sans-serif}
-  #hdr{position:fixed;top:24px;left:32px;right:32px;z-index:10;pointer-events:none;display:flex;justify-content:space-between;align-items:flex-end}
-  #hdr h1{font-size:28px;font-weight:700;letter-spacing:-.02em;background:linear-gradient(90deg,#fff,#93c5fd);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-  #hdr p{font-size:14px;color:#94a3b8;margin-top:4px}
-  #hint{font-size:12px;color:#64748b;letter-spacing:.04em;text-transform:uppercase}
-  .card{width:215px;padding:12px 14px;border-radius:12px;background:rgba(15,23,42,.78);backdrop-filter:blur(10px);border:1px solid rgba(148,163,184,.22);box-shadow:0 12px 32px rgba(0,0,0,.45);pointer-events:auto;transition:transform .2s,border-color .2s,box-shadow .2s;cursor:pointer}
-  .card:hover,.card.active{transform:translateY(-4px) scale(1.04);border-color:rgba(56,189,248,.8);box-shadow:0 16px 40px rgba(56,189,248,.22)}
-  .badge{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#38bdf8;margin-bottom:3px}
-  .theme{font-size:14px;font-weight:600;color:#f8fafc;margin-bottom:6px;line-height:1.25}
-  .pts{list-style:none;font-size:11.5px;color:#cbd5e1;line-height:1.45}
-  .pts li{padding-left:10px;position:relative;margin-top:2px}
-  .pts li::before{content:'';position:absolute;left:0;top:6px;width:4px;height:4px;border-radius:50%;background:#38bdf8}
+  * { box-sizing: border-box; }
+  html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: radial-gradient(circle at 50% 35%, #0f172a 0%, #030712 100%); color: #e2e8f0; font-family: system-ui, -apple-system, sans-serif; }
+  #hud { position: fixed; top: 20px; left: 28px; z-index: 10; pointer-events: none; max-width: 75%; }
+  #title { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.02em; color: #f8fafc; text-shadow: 0 2px 16px rgba(56,189,248,0.4); }
+  #subtitle { margin: 4px 0 0; font-size: 13px; color: #94a3b8; }
+  #hint { position: fixed; bottom: 14px; right: 20px; z-index: 10; pointer-events: none; font-size: 11px; color: #64748b; letter-spacing: 0.04em; }
+  .card { width: 190px; padding: 10px 12px; border-radius: 10px; background: rgba(8, 13, 26, 0.84); border: 1px solid rgba(148, 163, 184, 0.25); backdrop-filter: blur(8px); box-shadow: 0 8px 24px rgba(0,0,0,0.45); pointer-events: auto; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; }
+  .card.active { transform: scale(1.06); border-color: var(--accent); box-shadow: 0 0 22px var(--glow); }
+  .badge { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); }
+  .theme { margin: 2px 0 6px; font-size: 13px; font-weight: 600; color: #f1f5f9; line-height: 1.25; }
+  .pts { margin: 0; padding-left: 14px; font-size: 11px; color: #cbd5e1; line-height: 1.38; }
+  .pts li + li { margin-top: 2px; }
 </style>
 <script type="importmap">
-{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+  }
+}
 </script>
 </head>
 <body>
-<div id="hdr"><div><h1 id="t"></h1><p id="sub"></p></div><div id="hint">Drag to orbit · Scroll to zoom</div></div>
+<div id="hud"><h1 id="title"></h1><p id="subtitle"></p></div>
+<div id="hint">Drag to orbit · Scroll to zoom · Hover milestones</div>
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 
-const data = {"title":"2027 Go-To-Market Roadmap","subtitle":"Strategic expansion and revenue acceleration plan","items":[{"label":"Q1","theme":"Market Entry","points":["Beta launch","Early adopters","Feedback loop"]},{"label":"Q2","theme":"Scale Up","points":["Regional expansion","Partner network","Feature parity"]},{"label":"Q3","theme":"Optimization","points":["Churn reduction","Pricing pivot","Upsell paths"]},{"label":"Q4","theme":"Dominance","points":["Global rollout","Ecosystem play","Market leadership"]}]};
-document.getElementById('t').textContent = data.title;
-document.getElementById('sub').textContent = data.subtitle;
+const DATA = {"title":"2027 GTM Strategy","subtitle":"Scaling global market penetration and revenue growth","items":[{"label":"Q1","theme":"Market Entry","points":["Targeted beta launch","Initial user acquisition","Channel partner setup"]},{"label":"Q2","theme":"Growth Phase","points":["Scale paid media","Optimize conversion funnels","Expand regional reach"]},{"label":"Q3","theme":"Product Maturity","points":["Feature set expansion","Enterprise tier rollout","Churn reduction focus"]},{"label":"Q4","theme":"Market Dominance","points":["Global brand awareness","Strategic ecosystem integration","Maximized LTV growth"]}]};
+document.getElementById('title').textContent = DATA.title;
+document.getElementById('subtitle').textContent = DATA.subtitle;
 
-const W = window.innerWidth, H = window.innerHeight;
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(42, W / H, 0.1, 100);
-camera.position.set(0, 2.1, 12.2);
+const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 100);
+camera.position.set(0, 1.6, 12.2);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-renderer.setSize(W, H);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 document.body.appendChild(renderer.domElement);
 
 const labelRenderer = new CSS2DRenderer();
-labelRenderer.setSize(W, H);
+labelRenderer.setSize(innerWidth, innerHeight);
 Object.assign(labelRenderer.domElement.style, { position: 'fixed', top: '0', left: '0', pointerEvents: 'none' });
 document.body.appendChild(labelRenderer.domElement);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.06;
-controls.minDistance = 6;
-controls.maxDistance = 20;
+controls.target.set(0, 0.2, 0);
 
-scene.add(new THREE.AmbientLight(0x88aaff, 0.9));
-const keyLight = new THREE.PointLight(0x38bdf8, 28, 30);
-keyLight.position.set(4, 6, 8);
+scene.add(new THREE.AmbientLight(0x94a3b8, 1.1));
+const keyLight = new THREE.PointLight(0x38bdf8, 28, 35);
+keyLight.position.set(0, 6, 6);
 scene.add(keyLight);
 
-const starGeo = new THREE.BufferGeometry();
+const grid = new THREE.GridHelper(28, 28, 0x1e3a8a, 0x0f172a);
+grid.position.y = -2.6;
+scene.add(grid);
+
 const starPos = new Float32Array(900);
-for (let i = 0; i < 900; i++) starPos[i] = (Math.random() - 0.5) * 42;
+for (let i = 0; i < 900; i++) starPos[i] = (Math.random() - 0.5) * 40;
+const starGeo = new THREE.BufferGeometry();
 starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
-scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0x60a5fa, size: 0.06, transparent: true, opacity: 0.55 })));
+scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0x64748b, size: 0.07 })));
 
-const n = data.items.length || 1;
-const palette = [0x38bdf8, 0x818cf8, 0x34d399, 0xf472b6, 0xfbbf24, 0xa78bfa, 0x2dd4bf, 0xfb7185];
-const pts = [], nodes = [];
-let activeIdx = -1;
+const palette = ['#38bdf8', '#818cf8', '#34d399', '#f472b6', '#fbbf24', '#a78bfa', '#2dd4bf', '#fb7185'];
+const n = DATA.items.length;
+const span = Math.min(13.5, Math.max(5, (n - 1) * 2.5));
+const nodes = [];
+const points = [];
 
-data.items.forEach((item, i) => {
-  const u = n === 1 ? 0 : (i / (n - 1)) * 2 - 1;
-  const x = u * Math.min(5.2, 1.8 * n);
-  const y = Math.sin(u * Math.PI * 0.9) * 1.15 - 0.25;
-  const z = Math.cos(u * Math.PI) * 1.35;
-  const pos = new THREE.Vector3(x, y, z);
-  pts.push(pos);
-
+DATA.items.forEach((item, i) => {
+  const t = n > 1 ? i / (n - 1) : 0.5;
+  const pos = new THREE.Vector3((t - 0.5) * span, -1.1 + t * 1.9, Math.sin(i * 1.25) * 1.35);
+  points.push(pos);
   const color = palette[i % palette.length];
+
   const group = new THREE.Group();
   group.position.copy(pos);
-  const orb = new THREE.Mesh(
-    new THREE.SphereGeometry(0.24, 24, 24),
-    new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.7, roughness: 0.25, metalness: 0.6 })
+  const core = new THREE.Mesh(
+    new THREE.OctahedronGeometry(0.32, 0),
+    new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.55, roughness: 0.2, metalness: 0.6 })
   );
   const ring = new THREE.Mesh(
-    new THREE.TorusGeometry(0.4, 0.025, 12, 40),
-    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.75 })
+    new THREE.TorusGeometry(0.52, 0.025, 12, 40),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.7 })
   );
-  group.add(orb, ring);
+  ring.rotation.x = Math.PI / 2.4;
+  const pillar = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.015, 0.015, pos.y + 2.6, 8),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.35 })
+  );
+  pillar.position.y = -(pos.y + 2.6) / 2;
+  group.add(core, ring, pillar);
   scene.add(group);
 
   const card = document.createElement('div');
   card.className = 'card';
+  card.style.setProperty('--accent', color);
+  card.style.setProperty('--glow', color + '55');
   const badge = document.createElement('div');
   badge.className = 'badge';
-  badge.textContent = item.label;
+  badge.textContent = item.label || `Step ${i + 1}`;
   const theme = document.createElement('div');
   theme.className = 'theme';
   theme.textContent = item.theme;
   const ul = document.createElement('ul');
   ul.className = 'pts';
-  item.points.forEach(p => { const li = document.createElement('li'); li.textContent = p; ul.appendChild(li); });
+  item.points.forEach((pt) => {
+    const li = document.createElement('li');
+    li.textContent = pt;
+    ul.appendChild(li);
+  });
   card.append(badge, theme, ul);
-  card.addEventListener('mouseenter', () => { activeIdx = i; });
-  card.addEventListener('mouseleave', () => { activeIdx = -1; });
 
   const label = new CSS2DObject(card);
-  label.position.set(0, (i % 2 === 0 ? 1.18 : -1.28), 0);
+  const yOff = n > 4 ? (i % 2 === 0 ? 1.15 : -1.15) : 1.1;
+  label.position.set(0, yOff, 0);
   group.add(label);
-  nodes.push({ group, orb, ring, baseY: y });
+
+  const node = { core, ring, card, idx: i };
+  card.addEventListener('mouseenter', () => (hovered = i));
+  card.addEventListener('mouseleave', () => { if (hovered === i) hovered = -1; });
+  nodes.push(node);
 });
 
-if (pts.length >= 2) {
-  const curve = new THREE.CatmullRomCurve3(pts);
+if (points.length >= 2) {
+  const curve = new THREE.CatmullRomCurve3(points);
   scene.add(new THREE.Mesh(
-    new THREE.TubeGeometry(curve, 96, 0.045, 12, false),
-    new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x1d4ed8, emissiveIntensity: 0.85, roughness: 0.2 })
+    new THREE.TubeGeometry(curve, 80, 0.045, 10, false),
+    new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.55 })
   ));
 }
 
-window.addEventListener('resize', () => {
-  const w = window.innerWidth, h = window.innerHeight;
-  camera.aspect = w / h;
+let hovered = -1;
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+renderer.domElement.addEventListener('pointermove', (e) => {
+  pointer.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
+  raycaster.setFromCamera(pointer, camera);
+  const hits = raycaster.intersectObjects(nodes.map((x) => x.core));
+  hovered = hits.length ? nodes.findIndex((x) => x.core === hits[0].object) : -1;
+});
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setSize(w, h);
-  labelRenderer.setSize(w, h);
+  renderer.setSize(innerWidth, innerHeight);
+  labelRenderer.setSize(innerWidth, innerHeight);
 });
 
 const clock = new THREE.Clock();
-function animate() {
+(function animate() {
   requestAnimationFrame(animate);
   const t = clock.getElapsedTime();
-  nodes.forEach((nd, i) => {
-    const hover = activeIdx === i ? 1.35 : 1.0;
-    nd.group.position.y = nd.baseY + Math.sin(t * 1.4 + i) * 0.08;
-    nd.ring.rotation.x = t * 0.9 + i;
-    nd.ring.rotation.y = t * 0.6;
-    nd.orb.scale.lerp(new THREE.Vector3(hover, hover, hover), 0.12);
+  nodes.forEach((node, i) => {
+    const active = hovered === i;
+    node.core.rotation.y = t * 0.7 + i;
+    node.ring.rotation.z = t * (active ? 1.8 : 0.5) + i;
+    const s = active ? 1.35 : 1 + Math.sin(t * 2 + i) * 0.06;
+    node.core.scale.setScalar(s);
+    node.card.classList.toggle('active', active);
   });
   controls.update();
   renderer.render(scene, camera);
   labelRenderer.render(scene, camera);
-}
-animate();
+})();
 </script>
 </body>
 </html>

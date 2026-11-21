@@ -3,6 +3,7 @@
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
 const { spawn, execFile } = require('node:child_process');
 
 const HOST = '127.0.0.1';
@@ -175,9 +176,18 @@ const CODE_MILESTONES = [
 ];
 const TOOL_TEST = `const html = require(process.argv[1])({ title: 'Test Plan', subtitle: 'Smoke test',
   milestones: ['Phase 1 | Research | a b | c d | e f', 'Phase 2 | Build | g h | i j'] });
-if (typeof html !== 'string' || !/<html[\\s>]/i.test(html)) throw new Error('it did not return an HTML page');`;
+if (typeof html !== 'string' || !/<html[\\s>]/i.test(html)) throw new Error('it did not return an HTML page');
+require('fs').writeFileSync(process.argv[2], html);`;
+// The returned page is then loaded once in headless Chrome; uncaught errors or no <canvas> fail the test.
+const CHROME_BIN = process.env.CHROME_BIN || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+const TEST_DIR = path.join(os.tmpdir(), 'agent-boost-tool-test');
+const MAX_REPAIRS = 2;
 
-const neon = { state: 'idle', model: NEON_MODEL, phase: null, startedAt: null, finishedAt: null, error: null, steps: [] };
+// "gemini-4-hydrogen-medium" -> "Gemini 4 Hydrogen (Medium)"; replaced by agy's own name for the model once a run starts.
+const modelLabel = (id) =>
+  id.replace(/-(low|medium|high|xhigh)$/, (_, level) => ` (${level === 'xhigh' ? 'XHigh' : level[0].toUpperCase() + level.slice(1)})`)
+    .split('-').map((word) => word[0].toUpperCase() + word.slice(1)).join(' ');
+const neon = { state: 'idle', model: NEON_MODEL, modelName: modelLabel(NEON_MODEL), phase: null, plan: null, lines: 0, startedAt: null, finishedAt: null, error: null, steps: [] };
 let neonChild = null;
 
 function geminiPrompt(prompt) {
@@ -190,20 +200,39 @@ function geminiPrompt(prompt) {
   return slide ? `${prompt}\n\nGemma's current slide (body markup):\n${slide}` : prompt;
 }
 
-async function installTool(reply, step) {
+const run = (file, args, options) =>
+  new Promise((resolve) => execFile(file, args, { maxBuffer: 8 * 1024 * 1024, ...options }, (error, stdout, stderr) => resolve({ error, stdout, stderr })));
+
+// Runs Gemini's code on a different topic, renders the page it returns, and installs it only if both pass.
+// Returns null when installed, or the failure to send back to Gemini.
+async function testAndInstall(reply, step) {
   const match = reply.match(/```(?:js|javascript)?[^\n]*\n([\s\S]*?)```/);
-  if (!match) throw new Error('Gemini replied without a code block');
+  if (!match) return 'Your reply had no ```js code block.';
+  fs.mkdirSync(TEST_DIR, { recursive: true });
+  const page = path.join(TEST_DIR, 'page.html');
   fs.writeFileSync(CANDIDATE_FILE, match[1], 'utf8');
-  step('Test: running the tool on a different topic');
   try {
-    await new Promise((resolve, reject) =>
-      execFile(process.execPath, ['-e', TOOL_TEST, CANDIDATE_FILE], { cwd: TOOLS_DIR, timeout: 10000 }, (err, _out, stderr) =>
-        err ? reject(new Error(`Tool test failed: ${(stderr.trim().split('\n').find((l) => /Error/.test(l)) || err.message).slice(0, 160)}`)) : resolve()
-      )
-    );
-    step('Test passed: it returns a complete HTML page');
+    step('Test: running the tool on a different topic');
+    const node = await run(process.execPath, ['-e', TOOL_TEST, CANDIDATE_FILE, page], { cwd: TOOLS_DIR, timeout: 10000 });
+    if (node.error) return `Running the tool failed: ${(node.stderr.split('\n').find((l) => /Error/.test(l)) || node.error.message).trim().slice(0, 300)}`;
+
+    step('Test: rendering its page in a browser');
+    const chrome = await run(CHROME_BIN, [
+      '--headless=new', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--enable-logging=stderr', '--v=0',
+      '--virtual-time-budget=4000', '--window-size=1280,720', `--user-data-dir=${path.join(TEST_DIR, 'profile')}`,
+      '--dump-dom', `file://${page}`,
+    ], { timeout: 30000 });
+    if (chrome.error?.code === 'ENOENT') {
+      step('Browser test skipped: Chrome not found');
+    } else {
+      const uncaught = chrome.stderr.match(/CONSOLE:(\d+)\] "(Uncaught[^"]*)"/);
+      if (uncaught) return `The page threw "${uncaught[2]}" (line ${uncaught[1]} of the returned HTML).`;
+      if (!/<canvas/i.test(chrome.stdout)) return 'The page rendered no <canvas> (no 3D scene).';
+      step('Test passed: the page renders a 3D scene without errors');
+    }
     fs.renameSync(CANDIDATE_FILE, TOOL_FILE);
     step(`Installed ${path.relative(__dirname, TOOL_FILE)}: Gemma can now discover it`);
+    return null;
   } finally {
     fs.rmSync(CANDIDATE_FILE, { force: true });
   }
@@ -213,7 +242,8 @@ function startNeon(prompt) {
   // Each run starts with no tool implementations, so any tool Gemma finds afterwards was built in this run.
   for (const name of listTools()) fs.rmSync(path.join(TOOLS_DIR, `${name}.js`), { force: true });
   fs.rmSync(TOOL_OUTPUT_DIR, { recursive: true, force: true });
-  Object.assign(neon, { state: 'running', model: NEON_MODEL, phase: 'starting', startedAt: Date.now(), finishedAt: null, error: null, steps: [] });
+  Object.assign(gemma.tool, idleJob());
+  Object.assign(neon, { state: 'running', phase: 'starting', plan: null, lines: 0, startedAt: Date.now(), finishedAt: null, error: null, steps: [] });
 
   const child = spawn(AGY_BIN, ['acp'], { cwd: __dirname, stdio: ['pipe', 'pipe', 'pipe'] });
   neonChild = child;
@@ -229,6 +259,7 @@ function startNeon(prompt) {
   let stderrTail = '';
   let thinking = '';
   let reply = '';
+  let attempt = 0;
   const seen = new Set();
   const step = (text) => {
     neon.steps.push({ at: Date.now() - neon.startedAt, text });
@@ -256,7 +287,10 @@ function startNeon(prompt) {
     } else if (msg.method === 'session/update') {
       const update = msg.params.update;
       const text = update.content?.text || '';
-      if (update.sessionUpdate === 'agent_thought_chunk') {
+      if (update.sessionUpdate === 'config_option_update') {
+        // agy's own report of the session's model settings: logged as evidence of the model actually used.
+        log(`agy config ${JSON.stringify(update.configOptions?.map((o) => ({ [o.id]: o.currentValue })))}`);
+      } else if (update.sessionUpdate === 'agent_thought_chunk') {
         // Thought summaries start with a **heading**; the headings alone are the milestones.
         thinking = (thinking + text).slice(0, MAX_STREAM_CHARS);
         neon.phase = 'thinking';
@@ -273,13 +307,15 @@ function startNeon(prompt) {
         reply = (reply + text).slice(0, MAX_STREAM_CHARS);
         const fence = reply.indexOf('```');
         if (fence < 0) return;
-        once('plan', `Plan: ${reply.slice(0, fence).trim().slice(0, 240) || '(none given)'}`);
+        if (!neon.plan) neon.plan = reply.slice(0, fence).trim().slice(0, 300) || '(none given)';
+        once('plan', `Plan: ${neon.plan}`);
         const code = reply.slice(fence);
         neon.phase = 'writing code';
+        neon.lines = Math.max(0, code.split('\n').length - 2);
         for (const [pattern, label] of CODE_MILESTONES) if (pattern.test(code)) once(label, label);
         if (code.indexOf('```', 3) > 0) {
           neon.phase = 'testing';
-          once('complete', `Code complete: ${code.split('\n').length - 2} lines`);
+          once(`complete:${attempt}`, `Code complete: ${code.split('\n').length - 2} lines`);
         }
       }
     } else if (msg.id !== undefined) {
@@ -306,12 +342,26 @@ function startNeon(prompt) {
   log(`start model=${NEON_MODEL} prompt=${JSON.stringify(prompt)}`);
   (async () => {
     await request('initialize', { protocolVersion: 1, clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false } });
-    const { sessionId } = await request('session/new', { cwd: __dirname, mcpServers: [] });
+    const { sessionId, models } = await request('session/new', { cwd: __dirname, mcpServers: [] });
+    const listed = models?.availableModels?.find((model) => model.modelId === NEON_MODEL);
+    if (!listed) throw new Error(`agy does not offer ${NEON_MODEL}`);
     await request('session/set_model', { sessionId, modelId: NEON_MODEL });
-    step(`Asked ${NEON_MODEL} to build make_3d_slide`);
-    const result = await request('session/prompt', { sessionId, prompt: [{ type: 'text', text: geminiPrompt(prompt) }] });
-    log(`reply done ${result?.stopReason} ${JSON.stringify(result?.usage || {})}`);
-    await installTool(reply, step);
+    neon.modelName = listed.name;
+    step(`Asked ${neon.modelName} (${NEON_MODEL}) to build make_3d_slide()`);
+    let text = geminiPrompt(prompt);
+    for (;;) {
+      reply = '';
+      const result = await request('session/prompt', { sessionId, prompt: [{ type: 'text', text }] });
+      log(`reply done ${result?.stopReason} ${JSON.stringify(result?.usage || {})}`);
+      const failure = await testAndInstall(reply, step);
+      if (!failure) break;
+      step(`Test failed: ${failure}`);
+      if (attempt === MAX_REPAIRS) throw new Error(`Tool failed its test: ${failure}`);
+      attempt += 1;
+      step(`Repair ${attempt}: sending the error back to Gemini`);
+      neon.phase = 'repairing';
+      text = `Testing your tool failed: ${failure}\nFix it. Reply with the complete corrected tools/make_3d_slide.js in a single \`\`\`js block.`;
+    }
   })().then(
     () => finish(null),
     (err) => finish(err.message)
@@ -339,8 +389,15 @@ function listTools() {
 function startGemma(kind) {
   const job = gemma[kind];
   const withTools = kind === 'tool';
-  // Clear the panel's old output so it shows only this run's slide.
-  fs.rmSync(withTools ? TOOL_OUTPUT_DIR : ORIGINAL_FILE, { recursive: true, force: true });
+  // Clear the panel's old output so it shows only this run's slide. A new original also makes the old retry stale.
+  fs.rmSync(TOOL_OUTPUT_DIR, { recursive: true, force: true });
+  if (!withTools) {
+    // Step 1 starts the demo over: the tool must then be built again, live, by Gemini.
+    fs.rmSync(ORIGINAL_FILE, { force: true });
+    for (const name of listTools()) fs.rmSync(path.join(TOOLS_DIR, `${name}.js`), { force: true });
+    Object.assign(gemma.tool, idleJob());
+    Object.assign(neon, { state: 'idle', phase: null, plan: null, lines: 0, startedAt: null, finishedAt: null, error: null, steps: [] });
+  }
   Object.assign(job, { ...idleJob(), state: 'running', startedAt: Date.now() });
 
   const args = [path.join(__dirname, 'gemma-generate.js'), '--stream', ...(withTools ? ['--tools'] : [])];
@@ -444,7 +501,7 @@ function handleImprove(req, res) {
 function handleGemma(req, res) {
   readJsonPost(req, res, (body) => {
     const kind = body.withTools === true ? 'tool' : 'slide';
-    if (gemmaChild || (kind === 'tool' && (neon.state === 'running' || listTools().length === 0))) {
+    if (gemmaChild || neon.state === 'running' || (kind === 'tool' && listTools().length === 0)) {
       sendJson(res, 409, { gemma });
       return;
     }

@@ -7,18 +7,20 @@
   "toolCalls": [
     {
       "name": "make_3d_slide",
-      "arguments": "{\"milestones\":[\"Q1 | Market Entry | Beta launch | Early adopters | Feedback loop\",\"Q2 | Scale Up | Regional expansion | Partner network | Feature parity\",\"Q3 | Optimization | Churn reduction | Pricing pivot | Upsell paths\",\"Q4 | Dominance | Global rollout | Ecosystem play | Market leadership\"],\"subtitle\":\"Strategic expansion and revenue acceleration plan\",\"title\":\"2027 Go-To-Market Roadmap\"}"
+      "arguments": "{\"milestones\":[\"Q1 | Market Entry | Targeted beta launch | Initial user acquisition | Channel partner setup\",\"Q2 | Growth Phase | Scale paid media | Optimize conversion funnels | Expand regional reach\",\"Q3 | Product Maturity | Feature set expansion | Enterprise tier rollout | Churn reduction focus\",\"Q4 | Market Dominance | Global brand awareness | Strategic ecosystem integration | Maximized LTV growth\"],\"subtitle\":\"Scaling global market penetration and revenue growth\",\"title\":\"2027 GTM Strategy\"}"
     }
   ],
   "toolMs": 0.1,
+  "continuedFromOriginal": true,
+  "contentDifferences": [],
   "finishReason": "tool_calls",
-  "bytes": 7094,
-  "promptTokens": 326,
-  "completionTokens": 110,
-  "firstTokenMs": 1771.7,
-  "generationMs": 7391.2,
-  "tokensPerSec": 14.9,
-  "draftAccepted": 65,
-  "draftProposed": 78,
-  "totalMs": 7391.6
+  "bytes": 7951,
+  "promptTokens": 555,
+  "completionTokens": 124,
+  "firstTokenMs": 740.4,
+  "generationMs": 5023,
+  "tokensPerSec": 24.7,
+  "draftAccepted": 102,
+  "draftProposed": 103,
+  "totalMs": 5023.5
 }

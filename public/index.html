@@ -4,53 +4,56 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Agent Boost</title>
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230b0e14'/%3E%3Ccircle cx='16' cy='16' r='6' fill='%2360a5fa'/%3E%3C/svg%3E">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230e7490'/%3E%3Cpath d='M16 0h8a8 8 0 0 1 8 8v16a8 8 0 0 1-8 8h-8z' fill='%236d28d9'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
   <div class="app">
-    <header class="topbar">
+    <header class="top">
+      <span class="mark" aria-hidden="true"></span>
       <h1 class="brand">Agent Boost</h1>
-      <ol class="steps" aria-label="Demo steps">
-        <li class="step" data-step="slide" data-state="idle">
-          <button class="step-button" type="button">
-            <span class="step-num">1</span>
-            <span class="step-text"><span class="step-name">Gemma creates slide</span><span class="step-status" aria-live="polite"></span></span>
-          </button>
-        </li>
-        <li class="step" data-step="build" data-state="idle">
-          <form id="neon-form" class="step-form">
-            <input id="neon-prompt" class="neon-prompt" type="text" value="Integrate 3D visualization" maxlength="500" aria-label="Prompt for Gemini" required>
-            <button class="step-button" type="submit">
-              <span class="step-num">2</span>
-              <span class="step-text"><span class="step-name">Gemini builds tool</span><span class="step-status" aria-live="polite"></span></span>
-            </button>
-          </form>
-        </li>
-        <li class="step" data-step="tool" data-state="idle">
-          <button class="step-button" type="button">
-            <span class="step-num">3</span>
-            <span class="step-text"><span class="step-name">Gemma uses tool</span><span class="step-status" aria-live="polite"></span></span>
-          </button>
-        </li>
-      </ol>
+      <p class="tagline">One AI builds a tool that makes another AI better.</p>
     </header>
+
+    <ol class="steps" aria-label="Demo steps">
+      <li class="step" data-step="slide" data-owner="gemma" data-state="idle">
+        <button class="step-card" type="button">
+          <span class="step-num">1</span>
+          <span class="step-text"><span class="step-title">Gemma creates a slide</span><span class="step-sub"></span></span>
+          <span class="step-status" aria-live="polite"></span>
+        </button>
+      </li>
+      <li class="step-arrow" aria-hidden="true"></li>
+      <li class="step" data-step="build" data-owner="gemini" data-state="idle" data-prompt="Integrate 3D visualization">
+        <button class="step-card" type="button">
+          <span class="step-num">2</span>
+          <span class="step-text"><span class="step-title">Gemini builds Gemma a tool</span><span class="step-sub"></span></span>
+          <span class="step-status" aria-live="polite"></span>
+        </button>
+      </li>
+      <li class="step-arrow" aria-hidden="true"></li>
+      <li class="step" data-step="tool" data-owner="gemma" data-state="idle">
+        <button class="step-card" type="button">
+          <span class="step-num">3</span>
+          <span class="step-text"><span class="step-title">Gemma retries with the tool</span><span class="step-sub"></span></span>
+          <span class="step-status" aria-live="polite"></span>
+        </button>
+      </li>
+    </ol>
 
     <main class="stage">
       <section class="panel" data-panel="original" data-src="/gemma-slide.html">
         <div class="panel-inner">
           <div class="panel-label">
-            <span class="panel-title">Original <span class="panel-model">Gemma 31B</span></span>
-            <span class="status-badge" data-state="empty">Waiting</span>
+            <b class="who">Gemma 31B alone</b>
+            <span class="ctx">original slide, made locally</span>
           </div>
-          <div class="slide-viewport" data-state="empty">
-            <div class="slide-placeholder" role="status" aria-live="polite">
-              <span class="status-dot" aria-hidden="true"></span>
-              <p class="placeholder-title">Waiting for Gemma</p>
-            </div>
+          <div class="slide-viewport">
+            <div class="slide-placeholder"><p class="placeholder-title">Gemma's slide appears here</p></div>
             <iframe class="slide-frame" title="Original slide" sandbox="allow-scripts allow-same-origin" hidden></iframe>
-            <div class="live" hidden>
+            <div class="live" data-owner="gemma" hidden>
               <p class="live-head"></p>
+              <ol class="live-phases" hidden></ol>
               <ol class="live-steps"></ol>
             </div>
           </div>
@@ -60,23 +63,23 @@
       <section class="panel" data-panel="tool" data-src="/gemma-tool/index.html">
         <div class="panel-inner">
           <div class="panel-label">
-            <span class="panel-title">Gemma + New Tool <span class="panel-model">Gemma 31B + Gemini's tool</span></span>
-            <span class="status-badge" data-state="empty">Waiting</span>
+            <b class="who">Gemma 31B + <code>make_3d_slide()</code></b>
+            <span class="ctx" id="tool-ctx"></span>
           </div>
-          <div class="slide-viewport" data-state="empty">
-            <div class="slide-placeholder" role="status" aria-live="polite">
-              <span class="status-dot" aria-hidden="true"></span>
-              <p class="placeholder-title">Waiting for Gemma + tool</p>
-            </div>
+          <div class="slide-viewport">
+            <div class="slide-placeholder"><p class="placeholder-title">Gemma's slide with the new tool appears here</p></div>
             <iframe class="slide-frame" title="Slide made with the new tool" sandbox="allow-scripts allow-same-origin" hidden></iframe>
             <div class="live" hidden>
               <p class="live-head"></p>
+              <ol class="live-phases" hidden></ol>
               <ol class="live-steps"></ol>
             </div>
           </div>
         </div>
       </section>
     </main>
+
+    <footer class="hint" id="hint" aria-live="polite"></footer>
   </div>
 
   <script src="/app.js"></script>
