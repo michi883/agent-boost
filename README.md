@@ -37,3 +37,14 @@ Two side-by-side 16:9 panels, each rendered at 1280×720 and scaled to fit:
 - **Improved (Gemini Neon)** shows `public/gemini/index.html` and stays empty until that file exists. Any change to a file under `public/gemini/` reloads it.
 
 The page polls `/api/status` every 400 ms and reloads a panel only when its files change, with no browser refresh needed.
+
+## Live Gemini Improvement
+
+From the repo root (agy loads `AGENTS.md` automatically):
+
+```bash
+rm -rf public/gemini   # reset; the right panel shows "Waiting for Gemini"
+agy --model gemini-4-neon-xhigh --mode accept-edits
+```
+
+Then enter `Integrate 3D visualization`. Neon reads `public/gemma-slide.html` and writes `public/gemini/index.html`, which appears in the right panel. `--mode accept-edits` lets it write without an approval prompt.
