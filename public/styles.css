@@ -1,4 +1,4 @@
-/* Light presentation theme (after the prep tool): grey canvas, white cards, teal = Gemma, violet = Gemini. */
+/* Light presentation theme: grey canvas, white cards. Teal ● = Gemma (local); violet ✦ = Gemini and what it builds. */
 :root {
   --bg: #f3f4f6;
   --surface: #ffffff;
@@ -16,6 +16,8 @@
   --good-soft: #ecfdf5;
   --bad: #b91c1c;
   --bad-soft: #fef2f2;
+  --warn: #b45309;
+  --warn-soft: #fffbeb;
   --mono: ui-monospace, "SF Mono", Menlo, monospace;
 }
 
@@ -40,23 +42,85 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Header, steps, slides and hint form one block, centred vertically. */
+button,
+input {
+  font: inherit;
+}
+
+[data-owner="gemma"] {
+  --accent: var(--gemma);
+  --accent-soft: var(--gemma-soft);
+}
+
+[data-owner="gemini"] {
+  --accent: var(--gemini);
+  --accent-soft: var(--gemini-soft);
+}
+
+/* Agent names: each with its own mark and color wherever it appears, so Gemma and Gemini never blur together. */
+.agent {
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.agent::before {
+  display: inline-block;
+  margin-right: 0.28em;
+  font-size: 0.8em;
+  vertical-align: 0.06em;
+}
+
+.agent.gemma {
+  color: var(--gemma);
+}
+
+.agent.gemma::before {
+  content: "●";
+}
+
+.agent.gemini {
+  color: var(--gemini);
+}
+
+.agent.gemini::before {
+  content: "✦";
+}
+
+/* A tool Gemini built: always shown by its real name, in Gemini's color. */
+.tool-name {
+  padding: 1px 6px;
+  border: 1px solid var(--gemini-line);
+  border-radius: 6px;
+  background: var(--gemini-soft);
+  color: var(--gemini);
+  font: 650 0.9em var(--mono);
+  white-space: nowrap;
+}
+
+/* Header, action and slides form one block, centred vertically. */
 .app {
-  --pad: clamp(12px, 1.6vw, 24px);
-  --gap: clamp(10px, 1.2vw, 18px);
-  --label-h: 28px;
-  --label-gap: 6px;
+  --pad: clamp(14px, 1.7vw, 28px);
+  --gap: clamp(12px, 1.2vw, 20px);
+  --head-h: 34px;
   height: 100vh;
   height: 100dvh;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 12px;
+  gap: 14px;
   padding: var(--pad);
 }
 
+/* --- Header: brand, three compact progress indicators, New run --- */
 .top {
   flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.brand {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -65,24 +129,24 @@ body {
 
 .mark {
   flex: none;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   border-radius: 6px;
   background: linear-gradient(135deg, var(--gemma) 0 50%, var(--gemini) 50% 100%);
 }
 
-.brand {
+.brand h1 {
   margin: 0;
-  font-size: 15px;
-  font-weight: 700;
+  font-size: 16px;
+  font-weight: 750;
   white-space: nowrap;
 }
 
 .tagline {
-  margin: 0 0 0 4px;
-  padding-left: 14px;
+  margin: 0 0 0 2px;
+  padding-left: 12px;
   border-left: 1px solid var(--line);
-  font-size: 16px;
+  font-size: 14.5px;
   font-weight: 600;
   color: var(--body);
   white-space: nowrap;
@@ -90,253 +154,266 @@ body {
   text-overflow: ellipsis;
 }
 
-/* --- Three steps --- */
-.steps {
+.progress {
   flex: none;
-  margin: 0;
+  margin: 0 0 0 auto;
   padding: 0;
   list-style: none;
-  display: grid;
-  grid-template-columns: 1fr 20px 1.25fr 20px 1fr;
-  align-items: stretch;
-}
-
-.step {
-  min-width: 0;
-  --accent: var(--gemma);
-  --accent-soft: var(--gemma-soft);
-}
-
-.step[data-owner="gemini"] {
-  --accent: var(--gemini);
-  --accent-soft: var(--gemini-soft);
-}
-
-.step-arrow {
-  display: grid;
-  place-items: center;
-  color: var(--faint);
-}
-
-.step-arrow::before {
-  content: "→";
-  font-size: 16px;
-}
-
-.step-card {
-  width: 100%;
-  height: 100%;
-  min-height: 64px;
-  margin: 0;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 10px 10px 12px;
-  border: 1.5px solid var(--line);
-  border-radius: 12px;
-  background: var(--surface);
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-  transition: border-color 0.2s, box-shadow 0.2s, opacity 0.2s;
+  gap: 4px;
 }
 
-/* A step that cannot start yet is dimmed. */
-.step[data-state="idle"]:not(.next):has(.step-start:disabled) .step-card {
-  opacity: 0.6;
-}
-
-.step-start {
-  flex: none;
-  height: 34px;
-  padding: 0 12px;
-  border: 1.5px solid var(--line);
-  border-radius: 9px;
-  background: var(--surface);
-  color: var(--body);
-  font: inherit;
-  font-size: 13.5px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.step-start:hover:not(:disabled) {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.step-start:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-
-/* The next step's Start button is the one to press. */
-.step.next .step-start {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: #ffffff;
-}
-
-.step-input {
-  width: 100%;
-  min-width: 0;
-  height: 30px;
-  margin-top: 3px;
-  padding: 0 10px;
+.pstep {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 11px 0 5px;
   border: 1px solid var(--line);
-  border-radius: 7px;
-  background: #f8fafc;
-  color: var(--ink);
-  font: inherit;
-  font-size: 13px;
-}
-
-.step-input:focus {
-  outline: 2px solid color-mix(in srgb, var(--accent) 40%, transparent);
-  outline-offset: 0;
-  border-color: var(--accent);
+  border-radius: 999px;
   background: var(--surface);
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--faint);
+  white-space: nowrap;
 }
 
-.step-input:disabled {
-  color: var(--muted);
-}
-
-.step-num {
+.pdot {
   flex: none;
-  width: 28px;
-  height: 28px;
+  width: 22px;
+  height: 22px;
   display: grid;
   place-items: center;
   border-radius: 50%;
   background: #f1f5f9;
-  color: var(--muted);
-  font-size: 14px;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 750;
 }
 
-.step-text {
-  flex: 1 1 auto;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.step-title {
-  font-size: 14.5px;
-  font-weight: 700;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.step-sub {
-  font-size: 12.5px;
-  color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.step-status {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  font-weight: 650;
+.ptime {
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
-  color: var(--muted);
 }
 
-.step-status:empty {
+.ptime:empty {
   display: none;
 }
 
-/* Next step to click: accent outline and a filled "Start" pill. */
-.step.next .step-card {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
+.plink {
+  width: 10px;
+  height: 1.5px;
+  background: #cbd5e1;
 }
 
-.step.next .step-num,
-.step[data-state="running"] .step-num {
+.pstep[data-state="current"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.pstep[data-state="current"] .pdot,
+.pstep[data-state="running"] .pdot {
   background: var(--accent);
   color: #ffffff;
 }
 
-
-.step[data-state="running"] .step-card {
+.pstep[data-state="running"] {
   border-color: var(--accent);
   background: var(--accent-soft);
-}
-
-.step[data-state="running"] .step-num {
-  animation: ring 1.4s ease-out infinite;
-}
-
-.step[data-state="running"] .step-status {
   color: var(--accent);
 }
 
-.step[data-state="running"] .step-status::before {
-  content: "";
-  width: 12px;
-  height: 12px;
-  border: 2px solid color-mix(in srgb, var(--accent) 25%, transparent);
+.pstep[data-state="running"] .pdot {
+  animation: ring 1.4s ease-out infinite;
+}
+
+.pstep[data-state="done"] {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+  color: var(--body);
+}
+
+.pstep[data-state="done"] .pdot {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.pstep[data-state="pending"] .agent {
+  color: inherit;
+}
+
+.pstep[data-state="error"] {
+  border-color: #fecaca;
+  color: var(--bad);
+}
+
+.pstep[data-state="rejected"] {
+  border-color: #fcd34d;
+  color: var(--warn);
+}
+
+.ghost {
+  flex: none;
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--body);
+  font-size: 13.5px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.ghost:hover:not(:disabled) {
+  border-color: var(--muted);
+  color: var(--ink);
+}
+
+.ghost:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.ghost.tall {
+  height: 48px;
+  padding: 0 18px;
+  border-radius: 11px;
+  font-size: 15px;
+}
+
+/* --- The one action area --- */
+.action {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  min-height: 88px;
+  padding: 14px 18px 14px 22px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--accent);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 6px 20px rgba(15, 23, 42, 0.05);
+}
+
+.action-text {
+  flex: 0 1 38%;
+  min-width: 0;
+}
+
+.action-kicker {
+  margin: 0 0 3px;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--accent);
+}
+
+.action-title {
+  margin: 0;
+  font-size: clamp(17px, 1.35vw, 21px);
+  font-weight: 750;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+.action-notice {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--bad);
+}
+
+.action-notice.warn {
+  color: var(--warn);
+}
+
+.action-form,
+.action-run {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.action-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 48px;
+  padding: 0 16px;
+  border: 1.5px solid var(--line);
+  border-radius: 11px;
+  background: #f8fafc;
+  color: var(--ink);
+  font-size: 16px;
+}
+
+.action-input:focus {
+  outline: 3px solid color-mix(in srgb, var(--accent) 22%, transparent);
+  border-color: var(--accent);
+  background: var(--surface);
+}
+
+.action-desc,
+.action-detail {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.4;
+  color: var(--body);
+}
+
+.action-detail {
+  font-weight: 600;
+  color: var(--accent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.primary {
+  flex: none;
+  height: 48px;
+  padding: 0 24px;
+  border: 0;
+  border-radius: 11px;
+  background: var(--accent);
+  color: #ffffff;
+  font-size: 15.5px;
+  font-weight: 750;
+  cursor: pointer;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.primary:disabled {
+  opacity: 0.45;
+  cursor: default;
+  box-shadow: none;
+}
+
+.spinner {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border: 3px solid color-mix(in srgb, var(--accent) 20%, transparent);
   border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
 
-.step[data-state="running"] .step-sub {
-  color: var(--accent);
-}
-
-.step[data-state="done"] .step-num {
-  background: var(--good-soft);
-  color: var(--good);
-}
-
-.step[data-state="done"] .step-status {
-  color: var(--good);
-}
-
-.step[data-state="done"] .step-status::before {
-  content: "✓";
-}
-
-.step[data-state="error"] .step-card {
-  border-color: #fecaca;
-  background: var(--bad-soft);
-}
-
-.step[data-state="error"] .step-num,
-.step[data-state="error"] .step-sub,
-.step[data-state="error"] .step-status {
-  color: var(--bad);
-}
-
-.step[data-state="error"] .step-status::before,
-.step[data-state="rejected"] .step-status::before {
-  content: "✕";
-}
-
-.step[data-state="rejected"] .step-card {
-  border-color: #fcd34d;
-  background: #fffbeb;
-}
-
-.step[data-state="rejected"] .step-num,
-.step[data-state="rejected"] .step-status {
-  color: #b45309;
-}
-
-.step[data-state="rejected"] .step-num {
-  background: #fef3c7;
-}
-
-.step[data-state="error"] .step-num {
-  background: #fee2e2;
+.action-time {
+  flex: none;
+  min-width: 70px;
+  font-size: 24px;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
 }
 
 @keyframes spin {
@@ -350,7 +427,7 @@ body {
     box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent);
   }
   100% {
-    box-shadow: 0 0 0 8px transparent;
+    box-shadow: 0 0 0 7px transparent;
   }
 }
 
@@ -360,11 +437,11 @@ body {
   }
 }
 
-/* --- Slides: as large as the width allows; each cell holds the largest 16:9 slide (plus label) that fits. --- */
+/* --- Slides: Original and Improved, equal and as large as the width allows --- */
 .stage {
   flex: 0 1 auto;
   min-height: 0;
-  height: calc((100vw - 2 * var(--pad) - var(--gap)) / 2 * 9 / 16 + var(--label-h) + var(--label-gap));
+  height: calc((100vw - 2 * var(--pad) - var(--gap)) / 2 * 9 / 16 + var(--head-h) + 8px);
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--gap);
@@ -388,14 +465,14 @@ body {
 }
 
 .panel-inner {
-  width: min(100cqw, calc((100cqh - var(--label-h) - var(--label-gap)) * 16 / 9));
+  width: min(100cqw, calc((100cqh - var(--head-h) - 8px) * 16 / 9));
   display: flex;
   flex-direction: column;
-  gap: var(--label-gap);
+  gap: 8px;
 }
 
-.panel-label {
-  height: var(--label-h);
+.panel-head {
+  height: var(--head-h);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -403,24 +480,36 @@ body {
   padding: 0 2px;
 }
 
+.tag {
+  flex: none;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: var(--body);
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.tag.improved {
+  background: var(--gemini);
+  color: #ffffff;
+}
+
 .who {
   flex: none;
-  font-size: 14.5px;
-  color: var(--gemma);
+  font-size: 15px;
+  color: var(--ink);
   white-space: nowrap;
 }
 
-.who code {
-  margin-left: 2px;
-  padding: 1px 7px;
-  border: 1px solid var(--gemini-line);
-  border-radius: 6px;
-  background: var(--gemini-soft);
-  color: var(--gemini);
-  font: 600 13px var(--mono);
+.who .tool-name {
+  font-size: 13.5px;
 }
 
-.ctx {
+.panel-sub {
+  flex: 1 1 auto;
   min-width: 0;
   font-size: 13px;
   color: var(--muted);
@@ -429,30 +518,53 @@ body {
   text-overflow: ellipsis;
 }
 
-.slide-viewport {
+.details-toggle {
+  flex: none;
+  margin-left: auto;
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.details-toggle:hover,
+.details-toggle[aria-pressed="true"] {
+  border-color: var(--muted);
+  color: var(--ink);
+}
+
+.viewport {
   position: relative;
   width: 100%;
   aspect-ratio: 16 / 9;
-  border-radius: 12px;
+  border-radius: 14px;
   overflow: hidden;
   background: var(--surface);
-  box-shadow: 0 0 0 1px var(--line), 0 1px 2px rgba(15, 23, 42, 0.05), 0 12px 32px rgba(15, 23, 42, 0.1);
+  box-shadow: 0 0 0 1px var(--line), 0 1px 2px rgba(15, 23, 42, 0.05), 0 14px 36px rgba(15, 23, 42, 0.1);
 }
 
-.slide-placeholder {
+.empty {
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
-  padding: 24px;
-  background: #f8fafc;
+  padding: 10%;
+  background:
+    radial-gradient(circle at 50% 50%, #ffffff 0%, transparent 70%),
+    repeating-linear-gradient(135deg, #f8fafc 0 12px, #f1f5f9 12px 24px);
   text-align: center;
 }
 
-.placeholder-title {
+.empty p {
   margin: 0;
-  font-size: clamp(13px, 1.2vw, 17px);
+  max-width: 30ch;
+  font-size: clamp(14px, 1.2vw, 18px);
   font-weight: 600;
+  line-height: 1.4;
   color: var(--faint);
 }
 
@@ -468,96 +580,127 @@ body {
   background: #ffffff;
 }
 
-/* --- Live progress inside a slide viewport (Gemma's milestones, Gemini's build) --- */
-.live {
-  --accent: var(--gemma);
-  --accent-soft: var(--gemma-soft);
+/* --- Live progress and the installed-tool card, inside a viewport --- */
+.live,
+.tool-card,
+.details {
   position: absolute;
   inset: 0;
   z-index: 2;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: clamp(14px, 1.6vw, 24px) clamp(16px, 1.8vw, 28px);
+  padding: clamp(16px, 2vw, 30px) clamp(18px, 2.2vw, 34px);
   background: var(--surface);
 }
 
-.live[data-owner="gemini"] {
-  --accent: var(--gemini);
-  --accent-soft: var(--gemini-soft);
+.live {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
 .live-head {
   margin: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: clamp(14px, 1.15vw, 17px);
-  font-weight: 700;
+  gap: 9px;
+  font-size: clamp(15px, 1.25vw, 19px);
+  font-weight: 750;
   color: var(--accent);
 }
 
 .live.running .live-head::before {
   content: "";
   flex: none;
-  width: 9px;
-  height: 9px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   background: var(--accent);
   animation: pulse 1s ease-in-out infinite;
 }
 
-.live-sub {
-  margin: -6px 0 0;
-  font-size: 13.5px;
-  color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.live-phases {
+/* Step 2's stages: model, state and measured time each. */
+.stages {
   margin: 0;
   padding: 0;
   list-style: none;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  column-gap: 12px;
+  row-gap: 3px;
+  font-size: clamp(12.5px, 1vw, 15px);
 }
 
-.live-phases li {
-  padding: 4px 11px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  font-size: 12.5px;
-  font-weight: 650;
+.stages li {
+  display: contents;
   color: var(--faint);
 }
 
-.live-phases li.done {
-  border-color: #a7f3d0;
-  background: var(--good-soft);
-  color: var(--good);
+.stages li > * {
+  padding: 2px 0;
 }
 
-.live-phases li.done::before {
-  content: "✓ ";
+.stages b::before {
+  content: "○";
+  display: inline-block;
+  width: 1.3em;
+  font-weight: 750;
 }
 
-.live-phases li.current {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  color: var(--accent);
+.stages li.done {
+  color: var(--body);
 }
 
-.live-phases li.failed {
-  border-color: #fecaca;
-  background: var(--bad-soft);
+.stages li.done b::before {
+  content: "✓";
+  color: var(--gemini);
+}
+
+.stages li.current {
+  color: var(--ink);
+}
+
+.stages li.current b::before {
+  content: "●";
+  color: var(--gemini);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.stages li.failed {
   color: var(--bad);
 }
 
-/* Bottom-anchored: the newest milestone stays visible; older ones move up and off the top. */
-.live-steps {
+.stages li.failed b::before {
+  content: "✕";
+}
+
+.stages li.skipped b::before {
+  content: "–";
+}
+
+.stage-model {
+  font-weight: 600;
+  color: var(--gemini);
+}
+
+.stages li:not(.done):not(.current) .stage-model {
+  color: inherit;
+}
+
+.stages li:nth-last-child(-n + 2) .stage-model {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.stage-note {
+  color: var(--muted);
+}
+
+.stages time {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* Bottom-anchored: the newest milestones stay visible. */
+.milestones {
   flex: 1 1 0;
   min-height: 0;
   margin: 0;
@@ -567,46 +710,46 @@ body {
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  gap: 7px;
+  gap: 8px;
 }
 
-.live-steps li {
+.milestones li {
   display: flex;
   align-items: baseline;
   gap: 10px;
-  font-size: clamp(12.5px, 1vw, 15px);
+  font-size: clamp(13px, 1.05vw, 16px);
   line-height: 1.35;
   color: var(--body);
 }
 
-.live-steps li::before {
+.milestones li::before {
   content: "✓";
   flex: 0 0 12px;
-  font-weight: 700;
+  font-weight: 750;
   color: var(--good);
 }
 
-.live-steps li.current {
+.milestones li.current {
+  font-weight: 650;
   color: var(--ink);
-  font-weight: 600;
 }
 
-.live-steps li.current::before {
+.milestones li.current::before {
   content: "●";
   color: var(--accent);
   animation: pulse 1s ease-in-out infinite;
 }
 
-.live-steps li.failed {
+.milestones li.failed {
   color: var(--bad);
 }
 
-.live-steps li.failed::before {
+.milestones li.failed::before {
   content: "✕";
   color: var(--bad);
 }
 
-.live-steps time {
+.milestones time {
   flex: 0 0 46px;
   font-size: 0.85em;
   font-weight: 400;
@@ -615,23 +758,268 @@ body {
   color: var(--faint);
 }
 
-/* One line that says what is happening and what comes next. */
-.hint {
-  flex: none;
-  min-height: 22px;
-  margin: 0;
-  text-align: center;
-  font-size: 14.5px;
-  color: var(--body);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.tool-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+  background:
+    radial-gradient(circle at 85% 15%, var(--gemini-soft) 0%, transparent 55%),
+    var(--surface);
 }
 
-.hint b {
+.tool-card p {
+  margin: 0;
+}
+
+.tool-card-kicker {
+  font-size: 13px;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--good);
+}
+
+.tool-card-name .tool-name {
+  padding: 2px 10px;
+  border-radius: 9px;
+  font: 750 clamp(18px, 1.9vw, 30px) var(--mono);
+}
+
+.tool-card-request {
+  font-size: clamp(13.5px, 1.1vw, 16px);
+  font-weight: 650;
   color: var(--ink);
 }
 
-.hint.error {
+.tool-card-desc {
+  max-width: 62ch;
+  font-size: clamp(13px, 1.05vw, 15.5px);
+  line-height: 1.45;
+  color: var(--body);
+}
+
+.tool-card-checks {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tool-card-checks li {
+  padding: 4px 11px;
+  border-radius: 999px;
+  background: var(--good-soft);
+  color: var(--good);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.tool-card-checks li::before {
+  content: "✓ ";
+}
+
+.tool-card-next {
+  font-size: clamp(13px, 1.05vw, 15px);
+  font-weight: 600;
+  color: var(--body);
+}
+
+/* Technical log: secondary, opened per panel with Details. */
+.details {
+  z-index: 3;
+  overflow: auto;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--body);
+}
+
+.details h3 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 750;
+  color: var(--ink);
+}
+
+.details h3:not(:first-child) {
+  margin-top: 16px;
+}
+
+.details dl {
+  margin: 0 0 8px;
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px 12px;
+}
+
+.details dt {
+  color: var(--muted);
+}
+
+.details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.details ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.details ol time {
+  display: inline-block;
+  width: 52px;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.details pre {
+  margin: 4px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #f8fafc;
+  font: 12px/1.45 var(--mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* --- Evaluation: replaces the two slides while shown --- */
+.stage.show-eval > .panel {
+  display: none;
+}
+
+.eval-view {
+  grid-column: 1 / -1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: clamp(14px, 1.6vw, 24px) clamp(16px, 1.8vw, 28px);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--line), 0 14px 36px rgba(15, 23, 42, 0.08);
+}
+
+.eval-head h2 {
+  margin: 0;
+  font-size: clamp(16px, 1.35vw, 21px);
+  font-weight: 750;
+}
+
+.eval-sub {
+  margin: 3px 0 0;
+  font-size: clamp(12.5px, 1vw, 15px);
+  color: var(--muted);
+}
+
+.eval-scroll {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.eval-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: clamp(12px, 0.95vw, 15px);
+  font-variant-numeric: tabular-nums;
+}
+
+.eval-table th,
+.eval-table td {
+  padding: clamp(4px, 0.55vw, 9px) 6px;
+  border-bottom: 1px solid var(--line);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.eval-table th {
+  font-size: 0.86em;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.eval-table th.group {
+  font-size: 0.95em;
+  color: var(--ink);
+  border-bottom-width: 2px;
+}
+
+.eval-table th.group.gemma {
+  border-bottom-color: var(--gemma);
+}
+
+.eval-table th.group.gemini {
+  border-bottom-color: var(--gemini);
+  background: var(--gemini-soft);
+}
+
+.eval-table .task {
+  max-width: 0;
+  width: 30%;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--ink);
+}
+
+.eval-table th.first,
+.eval-table td:nth-child(1) + td ~ td.first {
+  border-left: 2px solid var(--line);
+}
+
+.kind {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: var(--body);
+  font-size: 0.78em;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.kind.unseen {
+  background: var(--gemini-soft);
+  color: var(--gemini);
+}
+
+.eval-table td.pass {
+  color: var(--good);
+  font-weight: 700;
+}
+
+.eval-table td.fail {
   color: var(--bad);
+  font-weight: 700;
+}
+
+.eval-table td.mixed {
+  color: var(--warn);
+  font-weight: 700;
+}
+
+.eval-table td.value {
+  color: var(--body);
+}
+
+.eval-table td.pending {
+  color: var(--faint);
+}
+
+.eval-table tfoot td {
+  border-bottom: 0;
+  font-weight: 750;
+}
+
+.eval-verdict {
+  margin: 0;
+  font-size: clamp(13px, 1.1vw, 16px);
+  font-weight: 650;
+  color: var(--ink);
 }

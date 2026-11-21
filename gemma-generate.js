@@ -28,11 +28,13 @@ function trackMilestones(content, call) {
     [...content.matchAll(/<h2>(.*?)<\/h2>/g)].forEach((m, i) => milestone(`Q${i + 1} · ${m[1]}`));
   }
 }
-const DEMO_PROMPT = process.argv.slice(2).find((arg) => !arg.startsWith('--')) || 'Create a 2027 go-to-market roadmap slide';
-const OUTPUT_PATH = path.resolve(__dirname, 'public', 'gemma-slide.html');
-const RAW_OUTPUT_PATH = path.resolve(__dirname, 'public', 'gemma-raw.html');
+const PROMPT = process.argv.slice(2).find((arg) => !arg.startsWith('--')) || 'Create a 2027 go-to-market roadmap slide';
+// --out=<dir>: where the slides go (default public/); the evaluation gives each unseen task its own folder.
+const OUT_DIR = path.resolve(process.argv.find((arg) => arg.startsWith('--out='))?.slice(6) || path.join(__dirname, 'public'));
+const OUTPUT_PATH = path.join(OUT_DIR, 'gemma-slide.html');
+const RAW_OUTPUT_PATH = path.join(OUT_DIR, 'gemma-raw.html');
 const TOOLS_DIR = path.resolve(__dirname, 'tools');
-const TOOL_OUTPUT_DIR = path.resolve(__dirname, 'public', 'gemma-tool');
+const TOOL_OUTPUT_DIR = path.join(OUT_DIR, 'gemma-tool');
 
 // Fixed, reusable 16:9 frame. Gemma writes the slide body; this shell only supplies styling.
 // Quarter labels (Q1-Q4) come from a CSS counter so Gemma doesn't spend tokens on them.
@@ -142,7 +144,7 @@ async function generateSlide() {
       chat_template_kwargs: { enable_thinking: false },
       messages: [
         { role: 'system', content: WITH_TOOLS ? TOOL_SYSTEM_PROMPT : SYSTEM_PROMPT },
-        { role: 'user', content: DEMO_PROMPT },
+        { role: 'user', content: PROMPT },
         ...(original ? [{ role: 'assistant', content: original }, { role: 'user', content: RETRY_PROMPT }] : []),
       ],
       ...(WITH_TOOLS && {
@@ -215,6 +217,7 @@ async function generateSlide() {
 
   if (!WITH_TOOLS) {
     html = SHELL_START + validBody(content, finishReason) + SHELL_END;
+    fs.mkdirSync(OUT_DIR, { recursive: true });
     fs.writeFileSync(RAW_OUTPUT_PATH, content, 'utf8');
     fs.writeFileSync(OUTPUT_PATH, html, 'utf8');
   } else {
@@ -249,7 +252,7 @@ async function generateSlide() {
 
   const completionTokens = usage?.completion_tokens ?? null;
   const summary = {
-    prompt: DEMO_PROMPT,
+    prompt: PROMPT,
     outputPath,
     ...(WITH_TOOLS && {
       toolsOffered: tools.map((tool) => tool.schema.name),

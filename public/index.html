@@ -10,84 +10,108 @@
 <body>
   <div class="app">
     <header class="top">
-      <span class="mark" aria-hidden="true"></span>
-      <h1 class="brand">Agent Boost</h1>
-      <p class="tagline">One AI builds a tool that makes another AI better.</p>
+      <div class="brand">
+        <span class="mark" aria-hidden="true"></span>
+        <h1>Agent Boost</h1>
+        <p class="tagline"><span class="agent gemini">Gemini</span> builds <span class="agent gemma">Gemma</span> a reusable tool.</p>
+      </div>
+      <ol class="progress" aria-label="Progress">
+        <li class="pstep" data-step="slide" data-owner="gemma"><span class="pdot">1</span><span class="plabel"><span class="agent gemma">Gemma</span> creates</span><span class="ptime"></span></li>
+        <li class="plink" aria-hidden="true"></li>
+        <li class="pstep" data-step="build" data-owner="gemini"><span class="pdot">2</span><span class="plabel"><span class="agent gemini">Gemini</span> builds a tool</span><span class="ptime"></span></li>
+        <li class="plink" aria-hidden="true"></li>
+        <li class="pstep" data-step="tool" data-owner="gemma"><span class="pdot">3</span><span class="plabel"><span class="agent gemma">Gemma</span> uses it</span><span class="ptime"></span></li>
+      </ol>
+      <button id="new-run" class="ghost" type="button">New run</button>
     </header>
 
-    <ol class="steps" aria-label="Demo steps">
-      <li class="step" data-step="slide" data-owner="gemma" data-state="idle">
-        <div class="step-card">
-          <span class="step-num">1</span>
-          <div class="step-text"><span class="step-title">Gemma creates a slide</span><span class="step-sub"></span></div>
-          <span class="step-status" aria-live="polite"></span>
-          <button class="step-start" type="button">Start</button>
-        </div>
-      </li>
-      <li class="step-arrow" aria-hidden="true"></li>
-      <li class="step" data-step="build" data-owner="gemini" data-state="idle">
-        <form class="step-card" id="build-form">
-          <span class="step-num">2</span>
-          <div class="step-text">
-            <span class="step-title">Gemini builds Gemma a tool</span>
-            <input id="build-request" class="step-input" type="text" value="Add interactive 3D visualization to slides" maxlength="500" required aria-label="Your request for Gemini's tool">
-          </div>
-          <span class="step-status" aria-live="polite"></span>
-          <button class="step-start" type="submit">Start</button>
-        </form>
-      </li>
-      <li class="step-arrow" aria-hidden="true"></li>
-      <li class="step" data-step="tool" data-owner="gemma" data-state="idle">
-        <div class="step-card">
-          <span class="step-num">3</span>
-          <div class="step-text"><span class="step-title">Gemma uses the tool</span><span class="step-sub"></span></div>
-          <span class="step-status" aria-live="polite"></span>
-          <button class="step-start" type="button">Start</button>
-        </div>
-      </li>
-    </ol>
+    <!-- One action at a time: the current step's input and button, its live progress, or the run results. -->
+    <section class="action" id="action" data-owner="gemma" aria-live="polite">
+      <div class="action-text">
+        <p class="action-kicker" id="action-kicker"></p>
+        <h2 class="action-title" id="action-title"></h2>
+        <p class="action-notice" id="action-notice" hidden></p>
+      </div>
+      <form class="action-form" id="action-form">
+        <input id="action-input" class="action-input" type="text" maxlength="500" autocomplete="off" aria-labelledby="action-title">
+        <p class="action-desc" id="action-desc" hidden></p>
+        <button id="action-alt" class="ghost tall" type="button" hidden></button>
+        <button id="action-button" class="primary" type="submit"></button>
+      </form>
+      <div class="action-run" id="action-run" hidden>
+        <p class="action-detail" id="action-detail"></p>
+        <span class="spinner" aria-hidden="true"></span>
+        <span class="action-time" id="action-time"></span>
+      </div>
+    </section>
 
     <main class="stage">
       <section class="panel" data-panel="original" data-src="/gemma-slide.html">
         <div class="panel-inner">
-          <div class="panel-label">
-            <b class="who">Gemma 31B alone</b>
-            <span class="ctx">original slide, made locally</span>
-          </div>
-          <div class="slide-viewport">
-            <div class="slide-placeholder"><p class="placeholder-title">Gemma's slide appears here</p></div>
+          <header class="panel-head">
+            <span class="tag">Original</span>
+            <b class="who"><span class="agent gemma">Gemma 31B</span> alone</b>
+            <span class="panel-sub"></span>
+            <button class="details-toggle" type="button" hidden>Details</button>
+          </header>
+          <div class="viewport">
+            <div class="empty"><p>Gemma's slide appears here</p></div>
             <iframe class="slide-frame" title="Original slide" sandbox="allow-scripts allow-same-origin" hidden></iframe>
-            <div class="live" data-owner="gemma" hidden>
+            <div class="live" hidden>
               <p class="live-head"></p>
-              <p class="live-sub" hidden></p>
-              <ol class="live-phases" hidden></ol>
-              <ol class="live-steps"></ol>
+              <ol class="stages" hidden></ol>
+              <ol class="milestones"></ol>
             </div>
+            <div class="details" hidden></div>
           </div>
         </div>
       </section>
 
       <section class="panel" data-panel="tool" data-src="/gemma-tool/index.html">
         <div class="panel-inner">
-          <div class="panel-label">
-            <b class="who">Gemma 31B + <code>make_3d_slide()</code></b>
-            <span class="ctx" id="tool-ctx"></span>
-          </div>
-          <div class="slide-viewport">
-            <div class="slide-placeholder"><p class="placeholder-title">Gemma's slide with the new tool appears here</p></div>
-            <iframe class="slide-frame" title="Slide made with the new tool" sandbox="allow-scripts allow-same-origin" hidden></iframe>
+          <header class="panel-head">
+            <span class="tag improved">Improved</span>
+            <b class="who"><span class="agent gemma">Gemma 31B</span> + <code class="tool-name">new tool</code></b>
+            <span class="panel-sub"></span>
+            <button class="details-toggle" type="button" hidden>Details</button>
+          </header>
+          <div class="viewport">
+            <div class="empty"><p>The improved slide appears here once Gemini has built Gemma a tool and Gemma has used it</p></div>
+            <iframe class="slide-frame" title="Improved slide, made with the new tool" sandbox="allow-scripts allow-same-origin" hidden></iframe>
             <div class="live" hidden>
               <p class="live-head"></p>
-              <p class="live-sub" hidden></p>
-              <ol class="live-phases" hidden></ol>
-              <ol class="live-steps"></ol>
+              <ol class="stages" hidden></ol>
+              <ol class="milestones"></ol>
             </div>
+            <div class="tool-card" hidden>
+              <p class="tool-card-kicker">New reusable tool installed</p>
+              <p class="tool-card-name"><code class="tool-name"></code></p>
+              <p class="tool-card-request"></p>
+              <p class="tool-card-desc"></p>
+              <ul class="tool-card-checks"></ul>
+              <p class="tool-card-next"></p>
+            </div>
+            <div class="details" hidden></div>
           </div>
         </div>
       </section>
-    </main>
 
-    <footer class="hint" id="hint" aria-live="polite"></footer>
+      <!-- Evaluation: the new tool on unseen slide requests, Gemma alone vs. Gemma with the tool. -->
+      <section class="eval-view" hidden>
+        <header class="eval-head">
+          <h2>Does <code class="tool-name"></code> work beyond the original slide?</h2>
+          <p class="eval-sub"></p>
+        </header>
+        <div class="eval-scroll">
+          <table class="eval-table">
+            <thead></thead>
+            <tbody></tbody>
+            <tfoot></tfoot>
+          </table>
+        </div>
+        <p class="eval-verdict"></p>
+      </section>
+    </main>
   </div>
 
   <script src="/app.js"></script>

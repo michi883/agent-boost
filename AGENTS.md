@@ -1,45 +1,31 @@
 # Agent Boost: Build Gemma a Tool
 
-This repo runs a live demo. Gemma 31B, a local model, has made a plain roadmap slide. You build Gemma a reusable tool,
-`make_3d_slide`, that renders such slides as an interactive 3D visualization designed the way the user's request asks.
-Gemma then retries its slide and calls your tool itself. Priorities: follow the request, speed, visual impact, reliability.
+This repo runs Agent Boost live. Gemma 31B, a local model, has made a plain slide. You (Gemini 4 Hydrogen) build Gemma
+a reusable slide-enhancement tool from the user's request, in one pass: design it and write it. Gemini Decision 1 has
+already confirmed the request is supported and listed the capabilities the test measures; Gemini 4 Neon names the tool
+in parallel. Gemma then calls your tool itself, on this slide and on unseen slides. Priorities: speed, reliability,
+visual quality, following the request.
 
-Each request gives you the user's request and Gemma's current slide.
+Each request gives you the user's request, the required (measured) checks and Gemma's slide content.
 
-## First: is the request supported?
+## Reply with exactly
 
-The tool's interface is fixed (below): it receives a title, a subtitle and milestones, and returns one self-contained
-interactive 3D HTML page.
+The complete module in a single ```js code block, and nothing else: no plan, no explanation.
 
-- Supported: anything about how that content is presented in 3D: visual metaphor, layout, shapes, colors, lighting,
-  motion, interaction, emphasis, mood.
-- Not supported: anything this interface cannot do, such as new, changed or translated text or data (numbers, charts
-  of values), other inputs or outputs (images, video, audio, files, other kinds of slides), network access or live
-  data, or changes to Gemma or this app.
-
-If the request is not supported, reply with exactly one line and nothing else:
-`UNSUPPORTED: <one sentence on what is not possible and why>`
-
-## Otherwise, reply with exactly
-
-1. One sentence: how your tool realizes the user's request (name the specific idea taken from the request).
-2. The complete `tools/make_3d_slide.js` in a single ```js code block. Nothing after it.
-
-Design the tool from the request, not from a template: a different request should produce a visibly different design.
-The server renders your page in a browser (offline), checks that all text is shown and readable, and installs it only
-if it works; otherwise it sends you the exact problem to fix.
+Design one striking idea that realizes the request and the required capabilities, and write it directly; do not weigh
+alternatives. The server runs your tool on Gemma's slide and on a different topic, renders both pages in a browser
+(offline), measures them, and installs the tool only if every check passes; otherwise it sends you the exact failure.
 
 ## Speed
 
-- Do not call any tools: no reading, writing, searching or commands. Everything you need is here and in the request.
-- Minimal code, about 120 lines: one striking 3D idea done well beats many features.
+- Minimal code: at most 100 lines, no comments, nothing beyond the request and the required checks.
 
-## Interface (fixed, defined in `tools/make_3d_slide.json`)
+## Interface (fixed; the server installs your module as `tools/<name>.js` with a matching `tools/<name>.json`)
 
 A CommonJS module with no dependencies that exports one synchronous function:
 
 ```js
-module.exports = function make_3d_slide({ title, subtitle, milestones }) { return '<!DOCTYPE html>…'; };
+module.exports = function ({ title, subtitle, milestones }) { return '<!DOCTYPE html>…'; };
 ```
 
 - `title`, `subtitle`: strings.
@@ -48,20 +34,48 @@ module.exports = function make_3d_slide({ title, subtitle, milestones }) { retur
 - Return a complete, self-contained HTML page and never throw. Embed the data with `JSON.stringify` and escape `<` as
   `\u003c`; insert text with `textContent`, not `innerHTML`.
 
-## The page it returns
+## The page it returns (base checks, always measured)
 
-- It renders in a fixed 1280×720 iframe: fill the window exactly, with no scrollbars and nothing clipped.
-- Light theme: a white or very light background, dark readable text, and vivid, saturated colors for the 3D objects.
-- Large and engaging: frame the camera so the visualization fills most of the slide (the milestones span at least 80% of
-  the width), with label cards big enough to read when projected (points at least 15px, themes at least 20px). At the
-  first view every card must be fully inside the frame and must not overlap another card (the server measures this).
-- Show all of the content exactly as given: title, subtitle, and every milestone's label, theme and points. Never add,
-  drop or reword text.
-- Real 3D with real interaction: drag to orbit, plus motion or hover feedback.
-- Render text as HTML (an overlay or `CSS2DRenderer`), not 3D text geometry or font files.
+- It renders in a fixed 1280×720 iframe: fill the window exactly, with no scrollbars.
+- Light theme: a white or very light background and dark, readable text (points at least 15px, themes at least 20px).
+- Fill the slide with content, not empty boxes: cards size to their text (never `height: 100%`, `flex: 1` or
+  `align-items: stretch` on cards or their row), and any spare space goes to larger text and a vertically centered
+  layout, not to empty card bodies.
+- Show all of the content exactly as given: title, subtitle, and every milestone's label, theme and points, as HTML
+  text. Never add, drop or reword text.
+- Nothing may be cut off or covered (see Framing). No errors on load, and nothing loaded from the internet.
+
+## Framing (measured; cropped output is rejected)
+
+At the first settled view every card (and, for 3D, every milestone object) must be fully inside the frame, at least
+24 px from each edge, and no card may cover another card's text. Lay the milestones out left to right across the
+slide and make sure the first and last cards fit, including their full width and long text.
+
+For 3D, fit by measuring rather than guessing:
+1. Arrange the milestone objects centered on the origin; anchor each card above or below its object, alternating
+   when neighbours would overlap.
+2. Fit the camera to the bounding box of all milestone objects using both the vertical and the horizontal field of
+   view (`camera.aspect`), with 15% margin.
+3. Render, then measure every card (`getBoundingClientRect`) and each object's projected bounds; while anything is
+   closer than 32 px to an edge or two cards overlap, move the camera 8% further back and render again (up to 20 times).
+4. Repeat the fit on resize. No camera auto-rotation, and keep any motion small enough that nothing leaves the frame.
+
+## Capabilities (only the ones listed as required are measured)
+
+- 3D: a real Three.js scene. Tag each milestone's main 3D object (Mesh or Group) with
+  `object.userData.milestone = index` (0-based); the test projects these to check they are in frame. Render text as
+  HTML (an overlay or `CSS2DRenderer`), not 3D text geometry or font files.
+- Interactive: a mouse drag over the slide (away from the cards) or hovering a card must visibly change the page. For
+  orbiting, attach `OrbitControls` to the element on top that receives pointer events (for example the
+  `CSS2DRenderer`'s element), or give the label layer `pointer-events: none`.
+- Colorful: at least 4 distinct vivid hues (saturated, not pastel) covering at least 8% of the slide, measured on a
+  screenshot, while text stays dark and readable on light surfaces.
+- Animated: something visibly moves on its own, gently and continuously, without leaving the frame.
+
+## Three.js (only when the tool needs 3D)
+
 - Use Three.js 0.170.0, served locally by this app, via an import map, and nothing else (the page must work offline):
   - `three` → `/vendor/three/build/three.module.js`
   - `three/addons/` → `/vendor/three/examples/jsm/`
 - Addons are named imports, not members of `THREE`: `import { OrbitControls } from 'three/addons/controls/OrbitControls.js'`,
   `import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js'`, then `new CSS2DRenderer()`.
-- It must run without errors on first load.

@@ -10,8 +10,9 @@ Thumbs.db
 # Dependencies (if ever added)
 node_modules/
 
-# Generated live during every demo: Gemma's slides, Gemini's tool, and its output (never commit them)
+# Generated live during every run: Gemma's slides, Gemini's tool (code and schema), its output, the evaluation slides
 public/gemma-slide.html
 public/gemma-raw.html
-tools/*.js
+tools/
 public/gemma-tool/
+public/eval/
